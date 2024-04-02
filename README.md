@@ -1,1 +1,6 @@
 # HHM-MID
+## Overview
+
+HMM-MID is an Hidden Markov Model for Local Ancestry Introgression (LAI). It was first designed for the detection of multiple archaic introgression in modern humans, but can be used to detect any combinaison of modern / archaic introgressions as well. The user provides a demographic model, a list of outgrouŝ, a list of reference populations, one ingroup population and the associated vcf files. HMM-MID then uses all the outgroups informations to infer for the ingroup individuals the genomics segments belonging to each of the provided ancestries. An outgroup population may be in the list of ancestries (in that case we would call it a reference population), but an ancestry can be detected even without any reference population, as it is often the case for Archaic detection, our model is agnostic in that regard. The whole model is described [cite] and is based on ideas from [Skov et al. 2018](https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1007641), our code is built from [https://github.com/LauritsSkov/Introgression-detection](https://github.com/LauritsSkov/Introgression-detection) where we added the extra layer which allows for the use of demographic models, multiple outgroups and the inference of more than two ancestries.
+
+### Main ideas
