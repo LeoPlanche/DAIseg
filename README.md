@@ -55,7 +55,7 @@ The callability file should be given as a .bed file.
 Simply run:
 
 ```
-./main.py whole  -demo=<demographic>.json -ind=<sample list>.json -vcfIn=<data for all samples in the ingroup>.bcf -vcfOut=<data for all samples in the outgroups>.bcf -weights=<mask>.bed -out=<out directory>
+./main.py all  -demo=<demographic>.json -ind=<sample list>.json -vcfIn=<data for all samples in the ingroup>.bcf -vcfOut=<data for all samples in the outgroups>.bcf -weights=<mask>.bed -out=<out directory>
 ```
 The bcf files for the ingroup and outgroup can be the same.
 The segments can be found for each individuals in:
