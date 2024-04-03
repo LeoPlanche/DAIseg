@@ -5,7 +5,7 @@ HMM-MID is an Hidden Markov Model for Local Ancestry Introgression (LAI). It was
 
 ## Preparing the data
 
-The user needs to provide a demograhic model, a list of samples he is working with, the associated bcf files and callability files.
+The user needs to provide a demograhic model, a list of samples, the associated bcf files and callability files.
 
 The demography is in a .json file and closely written as in [msprime](https://tskit.dev/msprime/docs/stable/demography.html), it contains:
  - A list of populations, 'pop', each population can take attributes 'outgroup', 'ingroup' or 'ancestral'. Attributes 'outgroup' and 'ingroup' are imcompatible with each other, but a population may have both attribute 'ancestral' and 'ingroup' or 'outgroup'. Let us give two quick examples, to detect Denisovan in Papuans, the outgroup populations would be Africans and Eurasians, the ingroup would be Papuans and the ancestral Neanderthal, Denisovan, non introgressed. To detect Neanderthal in modern europeans, the outgroup populations could be Africans and Neanderthals (see [citeAnna]), the ingroup modern Europeans and the ancestral Neanderthal and non introgressed.
