@@ -178,6 +178,76 @@ def initB(m,L,Ti,Ta,Tsep,Tn) -> np.array:
                 B[2][i][j]=0
     return B
 
+def printDemography(demography,fileOut):
+    with open(fileOut, 'w') as out:
+        out.write('{\n')
+        out.write('\t"pop": [ \n')
+        b=False
+        for pop in demography.populations:
+            if b:
+                out.write(',\n')
+            out.write('\t{"name": "'+pop.name+'", "type":['+pop.description+']}')
+            b=True
+
+        out.write('\n\t],\n')
+        out.write('\t"admixture":[\n')
+        b=False
+        for event in demography.events:
+            if type(event)==msprime.demography.Admixture:
+                if b:
+                    out.write(',\n')
+                b=True
+                out.write('\t{"time":'+str(event.time)+',"derived":"'+event.derived+'","ancestral":["'+event.ancestral[0]+'","'+event.ancestral[1]+'"], "proportions":['+str(event.proportions[0])+','+str(event.proportions[1])+']}')
+       
+        out.write('\n\t],\n')
+        out.write('\t"split":[\n')
+        b=False
+        for event in demography.events:
+            if type(event)==msprime.demography.PopulationSplit:
+                if b:
+                    out.write(',\n')
+                b=True
+                out.write('\t{"time":'+str(event.time)+',"derived":["'+event.derived[0]+'","'+event.derived[1]+'"],"ancestral":"'+event.ancestral+'"}')
+        out.write('\n\t]\n}')
+
+def printIndividuals(demography,fileOut):
+    tables = ts.dump_tables()
+    nodes = tables.nodes
+    with open(fileOut, 'w') as out:
+        out.write('{\n')
+        out.write('\t"ingroup": [')
+        for pop in demography.populations:
+            if "ingroup" in pop.description:
+                b=False
+                for ind in ts.individuals():
+                    if nodes[ind.nodes[0]].population == pop.id:
+                        if b:
+                            out.write(',')
+                        b=True
+                        out.write('"tsk_'+str(ind.id)+'"')
+             
+        out.write('],\n')
+        out.write('\t"outgroup": [\n')
+        c=False
+        for pop in demography.populations:
+            if "outgroup" in pop.description:
+                if c:
+                    out.write(',\n')
+                c=True
+                out.write('\t{"name": "'+pop.name+'", "ind":[')
+                b=False
+                for ind in ts.individuals():
+                    if nodes[ind.nodes[0]].population == pop.id:
+                        if b:
+                            out.write(',')
+                        b=True
+                        out.write('"tsk_'+str(ind.id)+'"')
+                out.write(']}')
+
+def printMask(seq_len,fileOut):
+    with open(fileOut, 'w') as out:
+        out.write('1\t0\t'+str(seq_len))
+        
 M=[]
     
 for w in range(nbP2*2):

@@ -21,7 +21,7 @@ class HMMParam:
         out = f'> state_names = {self.state_names.tolist()}\n'
         out += f'> starting_probabilities = {np.matrix.round(self.starting_probabilities, 3).tolist()}\n'
         out += f'> transitions = {np.matrix.round(self.transitions, 5).tolist()}\n'
-        out += f'> emissions = {np.matrix.round(self.emissions, 3).tolist()}'
+        out += f'> emissions = {np.matrix.round(self.emissions*1.25e-8, 3).tolist()}'
         return out
 
     def __repr__(self):
@@ -123,13 +123,15 @@ def logoutput(hmm_parameters, loglikelihood, iteration):
 # Decode
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-def DecodeModel(obs, hmm_parameters):
+def DecodeModel(obs, hmm_parameters, max_obs):
    
     mut_rate=1.25e-8
-    B = initB(hmm_parameters.emissions, mut_rate)
+    B = initB(hmm_parameters.emissions, mut_rate,max_obs)
     segments={}
     for chrom in obs:
-        segments[chrom] = viterbi(obs[chrom], hmm_parameters.starting_probabilities, hmm_parameters.transitions , B) 
+        segments[chrom]={}
+        for i in range(len(obs[chrom])):
+            segments[chrom][i] = viterbi(obs[chrom][i], hmm_parameters.starting_probabilities, hmm_parameters.transitions , B, max_obs) 
     return segments
 
 
@@ -151,19 +153,20 @@ def Write_Decoded_output(outputprefix, segments, filename , ind="" , window_size
         out.write('chrom\tstart\tend\tlength\tstate\n')
     
         for chrom in segments:
-            curr=segments[chrom]
-            start=0
-            state=curr[0]
-            for i in range(1,len(curr)):
-                if curr[i]!=curr[i-1]:
-                    out.write(f'{chrom}\t{start*window_size}\t{(i-1)*window_size}\t{i-start}\t{states_name[curr[i-1]]}\n')
-                    start=i
+            for ploidy in segments[chrom]:
+                curr=segments[chrom][ploidy]
+                start=0
+                state=curr[0]
+                for i in range(1,len(curr)):
+                    if curr[i]!=curr[i-1]:
+                        out.write(f'{chrom}\t{start*window_size}\t{(i-1)*window_size}\t{i-start}\t{states_name[curr[i-1]]}\n')
+                        start=i
 
     out.close()
 
 
-def initB(emissions, mut_rate) -> np.array: 
-    max_obs=40
+def initB(emissions, mut_rate, max_obs) -> np.array: 
+
     nb_states = len(emissions)
     nb_outgroup = len(emissions[0])
     B = np.empty(shape=(nb_states,pow(max_obs,nb_outgroup)))
@@ -211,15 +214,14 @@ def obs_to_ind(V,nb_outgroup,max_obs):
     return res
 
 
-def viterbi(V, initial_distribution, a, b):
+def viterbi(V, initial_distribution, a, b, max_obs):
     T = len(V)
     M = a.shape[0]
 
-    Z=40 #huge cheat
     
     omega = np.zeros((T, M))
     for i in range(M):
-        omega[0, i] = np.log(initial_distribution[i] * b[i][ obs_to_ind(V[0][i],M,Z)])
+        omega[0, i] = np.log(initial_distribution[i] * b[i][ obs_to_ind(V[0][i],M,max_obs)])
  
     prev = np.zeros((T - 1, M))
     
@@ -229,7 +231,7 @@ def viterbi(V, initial_distribution, a, b):
             # Same as Forward Probability
             probability=[]
             for i in range(M):
-                probability.append(omega[t - 1][i] + np.log(a[i, j]) + np.log(b[j][ obs_to_ind(V[t][j],M,Z)]))
+                probability.append(omega[t - 1][i] + np.log(a[i, j]) + np.log(b[j][ obs_to_ind(V[t][j],M,max_obs)]))
 
  
             # This is our most probable state given previous state at time t (1)

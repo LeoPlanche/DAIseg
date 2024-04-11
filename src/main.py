@@ -125,7 +125,7 @@ def main():
  
     decode_subparser.add_argument("-out", metavar='',help="outputfile prefix <out>.hap1.txt and <out>.hap2.txt if -haploid option is used or <out>.diploid.txt (default is stdout)", default = '/dev/stdout')
     decode_subparser.add_argument("-window_size", metavar='',help="size of bins (default is 1000 bp)", type=int, default = 1000)
-    decode_subparser.add_argument("-haploid",help="Change from using diploid data to haploid data (default is diploid)", action='store_true', default = False)
+    decode_subparser.add_argument("-haploid",help="Change from using diploid data to haploid data (default is diploid)", action='store_true', default = True)
     decode_subparser.add_argument("-admixpop",help="Annotate using vcffile with admixing population (default is none)")
     decode_subparser.add_argument("-extrainfo",help="Add archaic information on each SNP", action='store_true', default = False)
 
@@ -158,10 +158,11 @@ def main():
 
         #obs, chroms, starts, variants, mutrates, weights  = Load_observations_weights_mutrates(args.obs, args.weights, args.mutrates, args.window_size, args.haploid)
         hmm_parameters = create_HMM_parameters_from_file(args.demo)
-        obs =  Load_observations(args.obs, args.ind, args.demo, args.window_size, args.haploid)
+        (obs,max_obs)  =  Load_observations(args.obs, args.ind, args.demo, args.window_size, args.haploid)
         len_obs = 0
         for key in obs:
-            len_obs+=len(obs[key])
+            print(len(obs[key]))
+            len_obs+=len(obs[key][0])
                     
         print('-' * 40)
         print(hmm_parameters)  
@@ -172,7 +173,7 @@ def main():
         print('-' * 40)
 
         # Find segments and write output
-        segments = DecodeModel(obs, hmm_parameters)
+        segments = DecodeModel(obs, hmm_parameters,max_obs)
         Write_Decoded_output(args.out, segments, args.demo , window_size = args.window_size)
 
 
@@ -330,21 +331,22 @@ def main():
         hmm_parameters = create_HMM_parameters_from_file(args.demo)
 
         for individual in ingroup_individuals:
-            obs =  Load_observations(args.out, individual, args.demo, 1000, args.haploid,obs_name="obs/obs")
+            (obs,max_obs) =  Load_observations(args.out, individual, args.demo, 1000, haploid= args.haploid,obs_name="obs/obs")
             len_obs = 0
             for key in obs:
-                len_obs+=len(obs[key])
+                len_obs+=len(obs[key][0])
             
             print('-' * 40)
             print(hmm_parameters)  
             print('> number of windows:', len_obs)
+            print('> max observation per window:', max_obs)
             print('> Output prefix is',args.out+"/decode/") 
             print('> Window size is',1000, 'bp') 
             print('> Haploid',args.haploid) 
             print('-' * 40)
     
             # Find segments and write output
-            segments = DecodeModel(obs, hmm_parameters)
+            segments = DecodeModel(obs, hmm_parameters , max_obs)
             Write_Decoded_output(args.out, segments, args.demo , individual)
 
     # Print usage

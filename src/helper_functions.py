@@ -48,17 +48,19 @@ def make_callability_from_bed(bedfile, window_size):
     return callability
 
 
-def Load_observations(obs_file, ind, demo_file, window_size = 1000, haploid = False,obs_name=""):
+def Load_observations(obs_file, ind, demo_file, window_size = 1000, haploid = True,obs_name=""):
+
     if obs_name=="":
         obs_name=obs_file
 
     with open(demo_file) as json_file:
         data = json.load(json_file)
-    obs_counter = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    obs_counter = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list))))
     haplotypes = defaultdict(int)
     outgroup_name = []
     state_names = []
     obs= {}
+    max_obs=0
 
     for pop in  (pop for pop in data["pop"] if "ingroup" in pop["type"] ):
         ingroup_name=pop["name"]
@@ -74,14 +76,22 @@ def Load_observations(obs_file, ind, demo_file, window_size = 1000, haploid = Fa
                 if not line.startswith('chrom'):
                     chrom, pos, ancestral_base, genotype = line.strip().split()
                     rounded_pos = int(pos)//window_size
-                    obs_counter[chrom][rounded_pos][pop].append(pos)
-
+                    if haploid:
+                        obs_counter[chrom][rounded_pos][pop][0].append(pos)
+                        if len(obs_counter[chrom][rounded_pos][pop][0])>max_obs:
+                            max_obs=len(obs_counter[chrom][rounded_pos][pop][0])
+                    else:
+                        for i, base in enumerate(genotype):
+                            if base != ancestral_base:
+                                obs_counter[chrom][rounded_pos][pop][i].append(pos)
+                                if len(obs_counter[chrom][rounded_pos][pop][i])>max_obs:
+                                    max_obs=len(obs_counter[chrom][rounded_pos][pop][i])
     i=0
     posMax= {}
     ####
     times={}
     ancestral={}
-
+    
     for state in state_names:
         ancestries={}
         times = get_split_times(state,data,"outgroup")
@@ -96,35 +106,39 @@ def Load_observations(obs_file, ind, demo_file, window_size = 1000, haploid = Fa
             ancestral[state].append(key[0])
     ####   
     
-    
-    for key in obs_counter:
+    for chrom in obs_counter:
         maxi=-1
-        for pos in obs_counter[key]:
+        for pos in obs_counter[chrom]:
             if pos>maxi:
                 maxi=pos
-        posMax[key]=maxi  
+        posMax[chrom]=maxi  
 
+    if haploid:
+        ploidy=1
+    else:
+        ploidy=2
+    
     for chrom in obs_counter:
-        obs[chrom]=np.zeros((posMax[key]+1,len(state_names),len(outgroup_name)),dtype=int)
-        for pos in range(posMax[chrom]+1):
-            k=0
-            for state in state_names:
-                for i in range(len(outgroup_name)):
-                    nb=0
-                    for mut in obs_counter[chrom][pos][ancestral[state][0]]:
-                        b=True
-                        for j in range(i+1):
-                            if not mut in obs_counter[chrom][pos][ancestral[state][j]]:
-                                b=False
-                        if b:
-                            nb+=1
-                    obs[chrom][pos][k][i]=nb
-                for i in range(len(outgroup_name)-1):
-                    obs[chrom][pos][k][i]=obs[chrom][pos][k][i]-obs[chrom][pos][k][i+1]
-                k+=1
-                
-                        
-    return obs       
+        obs[chrom]=np.zeros((ploidy,posMax[chrom]+1,len(state_names),len(outgroup_name)),dtype=int)
+       
+        for pos in range(posMax[chrom]+1):         
+            for z in range(ploidy):
+                k=0
+                for state in state_names:
+                    for i in range(len(outgroup_name)):
+                        nb=0
+                        for mut in obs_counter[chrom][pos][ancestral[state][0]][z]:
+                            b=True
+                            for j in range(i+1):
+                                if not mut in obs_counter[chrom][pos][ancestral[state][j]][z]:
+                                    b=False
+                            if b:
+                                nb+=1
+                        obs[chrom][z][pos][k][i]=nb
+                    for i in range(len(outgroup_name)-1):
+                        obs[chrom][z][pos][k][i]=obs[chrom][z][pos][k][i]-obs[chrom][z][pos][k][i+1]
+                    k+=1
+    return (obs,max_obs+1)
             
 
 def Load_observations_weights_mutrates(obs_file, weights_file, mutrates_file, window_size = 1000, haploid = False):
