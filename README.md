@@ -1,16 +1,19 @@
 # HHM-MID
 ## Overview
 
-HMM-MID is an Hidden Markov Model for Local Ancestry Introgression (LAI). It was first designed for the detection of multiple archaic introgression in modern humans, but can be used to detect any combinaison of modern / archaic introgressions as well. The user provides a demographic model, a list of outgrouŝ, a list of reference populations, one ingroup population and the associated vcf files. HMM-MID then uses all the outgroups informations to infer for the ingroup individuals the genomics segments belonging to each of the provided ancestries. An outgroup population may be in the list of ancestries (in that case we would call it a reference population), but an ancestry can be detected even without any reference population, as it is often the case for Archaic detection, our model is agnostic in that regard. The whole model is described [cite] and is based on ideas from [Skov et al. 2018](https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1007641), our code is built from [https://github.com/LauritsSkov/Introgression-detection](https://github.com/LauritsSkov/Introgression-detection) where we added the extra layer which allows for the use of demographic models, multiple outgroups and the inference of more than two ancestries.
+HMM-MID is an Hidden Markov Model for Local Ancestry Introgression (LAI). It was first designed for the simultaneous detection of multiple archaic introgression in modern humans, but can be used as well to detect any combinaison of modern / archaic introgressions. The user provides a demographic model (defined below) containing a list of outgroups, one ingroup population and the list of the ancestries he is looking for in the ingroup. HMM-MID then uses all the outgroups informations to infer for the ingroup individuals the genomics segments belonging to each of the provided ancestries. An outgroup population may be in the list of ancestries (in that case we would call it a reference population), but an ancestry can be detected even without any reference population, as it is often the case for Archaic detection, our model is agnostic in that regard. The whole model is described [cite] and is based on ideas from [Skov et al. 2018](https://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1007641), our code is built from [https://github.com/LauritsSkov/Introgression-detection](https://github.com/LauritsSkov/Introgression-detection) where we added the extra layer which allows for the use of demographic models, multiple outgroups and the inference of more than two ancestries.
 
 ## Preparing the data
 
 The user needs to provide a demograhic model, a list of samples, the associated bcf files and callability file.
 
 The demography is in a .json file and closely written as in [msprime](https://tskit.dev/msprime/docs/stable/demography.html), it contains:
- - A list of populations, 'pop', each population can take attributes 'outgroup', 'ingroup' or 'ancestral'. Attributes 'outgroup' and 'ingroup' are imcompatible with each other, but a population may have both attribute 'ancestral' and 'ingroup' or 'outgroup'. Let us give two quick examples, to detect Denisovan in Papuans, the outgroup populations would be Africans and Eurasians, the ingroup would be Papuans and the ancestral Neanderthal, Denisovan, non introgressed. To detect Neanderthal in modern europeans, the outgroup populations could be Africans and Neanderthals (see [citeAnna]), the ingroup modern Europeans and the ancestral Neanderthal and non introgressed.
- - A list of admixtures, 'admixture', containing attributes 'time', the time of admixture, 'derived', the population resulting from admixture, 'ancestral', a list of the two populations which admixed together, and 'proportions', a list of two number, corresponding to the admixture proportion of each of the two ancestral populations.
- - A list of split, 'split', containing attributes 'time', the time of split, 'derived', a list of the two populations resulting from the split, 'ancestral', the population which split into the two derived ones.
+ - A list of populations, `pop`, each population can take attributes `outgroup`, `ingroup` or `ancestral`. Attributes `outgroup` and `ingroup` are incompatible with each other, but a population may have both attribute `ancestral` and `ingroup` or `outgroup`. Actually to define the non admixed ancestry, it is necessary to add attribute `ancestral` to the population with attribute `ingroup`.
+   
+   Let us give two quick examples.
+   To detect Neanderthal, Denisovan and non introgressed segments in Papuans, the `outgroup` populations would be Africans and Eurasians (see [cite]), the `ingroup` would be Papuans and the `ancestral` Neanderthal, Denisovan and Papuans (non introgressed). To detect Neanderthal and non introgressed segments in modern europeans, the `outgroup` populations could be Africans and Neanderthals (see [citeAnna]), the `ingroup` modern Europeans and the `ancestral` Neanderthal and modern Europeans.
+ - A list of admixtures, `admixture`, containing attributes `time`, the time of admixture, `derived`, the population resulting from admixture, `ancestral`, a list of the two populations which admixed together, and `proportions`, a list of two number, corresponding to the admixture proportion of each of the two ancestral populations.
+ - A list of split, `split`, containing attributes `time`, the time of split, `derived`, a list of the two populations resulting from the split, `ancestral`, the population which split into the two derived ones.
 
 Here is a simple example, which corresponds to the detection of Neanderthal in modern Eurasians, using only Africans as outgroup:
 
@@ -55,7 +58,7 @@ The callability file should be given as a .bed file.
 Simply run:
 
 ```
-./main.py whole  -demo=<demographic>.json -ind=<sample list>.json -vcfIn=<data for all samples in the ingroup>.bcf -vcfOut=<data for all samples in the outgroups>.bcf -weights=<mask>.bed -out=<out directory>
+./main.py all  -demo=<demographic>.json -ind=<sample list>.json -vcfIn=<data for all samples in the ingroup>.bcf -vcfOut=<data for all samples in the outgroups>.bcf -weights=<mask>.bed -out=<out directory>
 ```
 The bcf files for the ingroup and outgroup can be the same.
 The segments can be found for each individuals in:
