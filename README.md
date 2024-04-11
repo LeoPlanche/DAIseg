@@ -60,6 +60,8 @@ Simply run:
 ```
 ./main.py all  -demo=<demographic>.json -ind=<sample list>.json -vcfIn=<data for all samples in the ingroup>.bcf -vcfOut=<data for all samples in the outgroups>.bcf -weights=<mask>.bed -out=<out directory>
 ```
+If the data is unphased add option `haploid`.
+
 The bcf files for the ingroup and outgroup can be the same.
 The segments can be found for each individuals in:
 ```
