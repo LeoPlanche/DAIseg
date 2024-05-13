@@ -161,6 +161,7 @@ def Write_Decoded_output(outputprefix, segments, filename , ind="" , window_size
                     if curr[i]!=curr[i-1]:
                         out.write(f'{chrom}\t{start*window_size}\t{(i-1)*window_size}\t{i-start}\t{states_name[curr[i-1]]}\n')
                         start=i
+                out.write(f'{chrom}\t{start*window_size}\t{len(curr)*window_size}\t{len(curr)-start}\t{states_name[curr[-1]]}\n')
 
     out.close()
 
