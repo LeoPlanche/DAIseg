@@ -28,7 +28,7 @@ class HMMParam:
         return f'{self.__class__.__name__}({self.state_names}, {self.starting_probabilities}, {self.transitions}, {self.emissions})'
         
 # Read HMM parameters from a json file
-def create_HMM_parameters_from_file(filename):
+def create_HMM_parameters_from_file(filename,conditional=False):
     rec_rate =1.2e-9
 
     with open(filename) as json_file:
@@ -49,23 +49,38 @@ def create_HMM_parameters_from_file(filename):
     for state in  (state for state in data["pop"] if "ancestral" in state["type"] ):
         state_names.append(state["name"])
 
-    for state in state_names:
-        starting_probabilities.append(get_ancestral_proportion(state,data))        
-        emissions.append([])
-        times = get_split_times(state,data,"outgroup")
-        for i in range(len(outgroup_name)):
-            ancestries_ingroup = get_ancestries(ingroup_name,data)   
-            ancestries_outgtoup = get_ancestries(outgroup_name[i],data)   
-            times[i] = max(times[i],get_most_recent_ancestor(ancestries_ingroup,ancestries_outgtoup))
-        
-        times.sort(reverse=True)
-        for i in range(len(times)-1):
-            emissions[-1].append((times[i]-times[i+1])*1000)
-        emissions[-1].append(times[-1]*1000)
-        
-    for i in range(len(starting_probabilities)):
-        if starting_probabilities[i]==1:
-            starting_probabilities[i]=2-sum(starting_probabilities)
+    if conditional:
+        for state in state_names:
+            starting_probabilities.append(get_ancestral_proportion(state,data))        
+            emissions.append([])
+            times = get_split_times(state,data,"outgroup")
+            for i in range(len(outgroup_name)):
+                ancestries_ingroup = get_ancestries(ingroup_name,data)   
+                ancestries_outgtoup = get_ancestries(outgroup_name[i],data)   
+                times[i] = max(times[i],get_most_recent_ancestor(ancestries_ingroup,ancestries_outgtoup))
+            
+            times.sort(reverse=True)
+            for i in range(len(times)-1):
+                emissions[-1].append((times[i]-times[i+1])*1000)
+            emissions[-1].append(times[-1]*1000)
+            
+        for i in range(len(starting_probabilities)):
+            if starting_probabilities[i]==1:
+                starting_probabilities[i]=2-sum(starting_probabilities)
+    else:
+        for state in state_names:
+            starting_probabilities.append(get_ancestral_proportion(state,data))        
+            emissions.append([])
+            times = get_split_times(state,data,"outgroup")
+            for i in range(len(outgroup_name)):
+                ancestries_ingroup = get_ancestries(ingroup_name,data)   
+                ancestries_outgtoup = get_ancestries(outgroup_name[i],data)   
+                times[i] = max(times[i],get_most_recent_ancestor(ancestries_ingroup,ancestries_outgtoup))
+                emissions[-1].append(times[i]*1000)
+            
+        for i in range(len(starting_probabilities)):
+            if starting_probabilities[i]==1:
+                starting_probabilities[i]=2-sum(starting_probabilities)
 
 
     recombination_time=get_split_times_recombination(ingroup_name,data,"ancestral")

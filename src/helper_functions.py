@@ -48,7 +48,7 @@ def make_callability_from_bed(bedfile, window_size):
     return callability
 
 
-def Load_observations(obs_file, ind, demo_file, window_size = 1000, haploid = True,obs_name=""):
+def Load_observations(obs_file, ind, demo_file, window_size = 1000, haploid = True,obs_name="",conditional=False):
 
     if obs_name=="":
         obs_name=obs_file
@@ -89,21 +89,23 @@ def Load_observations(obs_file, ind, demo_file, window_size = 1000, haploid = Tr
     i=0
     posMax= {}
     ####
-    times={}
-    ancestral={}
-    
-    for state in state_names:
-        ancestries={}
-        times = get_split_times(state,data,"outgroup")
-        for i in range(len(outgroup_name)):
-            ancestries_ingroup = get_ancestries(ingroup_name,data)   
-            ancestries_outgtoup = get_ancestries(outgroup_name[i],data)   
-            times[i] = max(times[i],get_most_recent_ancestor(ancestries_ingroup,ancestries_outgtoup))
-            ancestries[outgroup_name[i]]=times[i]
-        ancestries = sorted(ancestries.items(), key=lambda x:x[1], reverse = True)
-        ancestral[state]=[]
-        for key in ancestries:
-            ancestral[state].append(key[0])
+    if conditional:
+        times={}
+        ancestral={}
+        
+        for state in state_names:
+            ancestries={}
+            times = get_split_times(state,data,"outgroup")
+            for i in range(len(outgroup_name)):
+                ancestries_ingroup = get_ancestries(ingroup_name,data)   
+                ancestries_outgtoup = get_ancestries(outgroup_name[i],data)   
+                times[i] = max(times[i],get_most_recent_ancestor(ancestries_ingroup,ancestries_outgtoup))
+                ancestries[outgroup_name[i]]=times[i]
+            ancestries = sorted(ancestries.items(), key=lambda x:x[1], reverse = True)
+            ancestral[state]=[]
+            for key in ancestries:
+                ancestral[state].append(key[0])
+        
     ####   
     
     for chrom in obs_counter:
@@ -117,27 +119,41 @@ def Load_observations(obs_file, ind, demo_file, window_size = 1000, haploid = Tr
         ploidy=1
     else:
         ploidy=2
-    
-    for chrom in obs_counter:
-        obs[chrom]=np.zeros((ploidy,posMax[chrom]+1,len(state_names),len(outgroup_name)),dtype=int)
-       
-        for pos in range(posMax[chrom]+1):         
-            for z in range(ploidy):
-                k=0
-                for state in state_names:
-                    for i in range(len(outgroup_name)):
-                        nb=0
-                        for mut in obs_counter[chrom][pos][ancestral[state][0]][z]:
-                            b=True
-                            for j in range(i+1):
-                                if not mut in obs_counter[chrom][pos][ancestral[state][j]][z]:
-                                    b=False
-                            if b:
+
+    if conditional:
+        for chrom in obs_counter:
+            obs[chrom]=np.zeros((ploidy,posMax[chrom]+1,len(state_names),len(outgroup_name)),dtype=int)
+           
+            for pos in range(posMax[chrom]+1):         
+                for z in range(ploidy):
+                    k=0
+                    for state in state_names:
+                        for i in range(len(outgroup_name)):
+                            nb=0
+                            for mut in obs_counter[chrom][pos][ancestral[state][0]][z]:
+                                b=True
+                                for j in range(i+1):
+                                    if not mut in obs_counter[chrom][pos][ancestral[state][j]][z]:
+                                        b=False
+                                if b:
+                                    nb+=1
+                            obs[chrom][z][pos][k][i]=nb
+                        for i in range(len(outgroup_name)-1):
+                            obs[chrom][z][pos][k][i]=obs[chrom][z][pos][k][i]-obs[chrom][z][pos][k][i+1]
+                        k+=1
+
+    else:
+        for chrom in obs_counter:
+            obs[chrom]=np.zeros((ploidy,posMax[chrom]+1,len(state_names),len(outgroup_name)),dtype=int)    
+            for pos in range(posMax[chrom]+1):         
+                for z in range(ploidy):
+                    for k in range(len(state_names)):
+                        for i in range(len(outgroup_name)):
+                            nb=0
+                            for mut in obs_counter[chrom][pos][outgroup_name[i]][z]:
                                 nb+=1
-                        obs[chrom][z][pos][k][i]=nb
-                    for i in range(len(outgroup_name)-1):
-                        obs[chrom][z][pos][k][i]=obs[chrom][z][pos][k][i]-obs[chrom][z][pos][k][i+1]
-                    k+=1
+                            obs[chrom][z][pos][k][i]=nb
+                        
     return (obs,max_obs+1)
             
 

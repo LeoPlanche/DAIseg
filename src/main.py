@@ -119,7 +119,7 @@ def main():
     decode_subparser = subparser.add_parser('decode', help='Decode HMM')
     decode_subparser.add_argument("-obs",help="[required] directory with observation data", type=str, required = True)
     decode_subparser.add_argument("-ind",help="[required] individual", type=str, required = True)
-    decode_subparser.add_argument("-demo", metavar='',help="demographic model file", required = True)
+    decode_subparser.add_argument("-demo", metavar='',help="[required] demographic model file", required = True)
     decode_subparser.add_argument("-weights", metavar='',help="file with callability (defaults to all positions being called)")
     decode_subparser.add_argument("-mutrates", metavar='',help="file with mutation rates (default is mutation rate is uniform)")
  
@@ -128,6 +128,7 @@ def main():
     decode_subparser.add_argument("-haploid",help="Change from using diploid data to haploid data (default is diploid)", action='store_true', default = True)
     decode_subparser.add_argument("-admixpop",help="Annotate using vcffile with admixing population (default is none)")
     decode_subparser.add_argument("-extrainfo",help="Add archaic information on each SNP", action='store_true', default = False)
+    decode_subparser.add_argument("-conditional",help="Use conditional probability (default is False)", action='store_true', default = False)
 
     # all model
     all_subparser = subparser.add_parser('all', help='Run HMM from beginning to end')
@@ -140,6 +141,7 @@ def main():
     all_subparser.add_argument("-ancestral", metavar='',help="fasta file with ancestral information - comma-separated list or wildcards like vcf argument (default none)", default='')
     all_subparser.add_argument("-refgenome", metavar='',help="fasta file with reference genome - comma-separated list or wildcards like vcf argument (default none)", default='')
     all_subparser.add_argument("-haploid",help="Change from using diploid data to haploid data (default is diploid)", action='store_true', default = False)
+    all_subparser.add_argument("-conditional",help="Use conditional probability (default is False)", action='store_true', default = False)
     
     
 
@@ -157,24 +159,29 @@ def main():
     elif args.mode == 'decode':
 
         #obs, chroms, starts, variants, mutrates, weights  = Load_observations_weights_mutrates(args.obs, args.weights, args.mutrates, args.window_size, args.haploid)
-        hmm_parameters = create_HMM_parameters_from_file(args.demo)
-        (obs,max_obs)  =  Load_observations(args.obs, args.ind, args.demo, args.window_size, args.haploid)
-        len_obs = 0
-        for key in obs:
-            print(len(obs[key]))
-            len_obs+=len(obs[key][0])
-                    
-        print('-' * 40)
-        print(hmm_parameters)  
-        print('> number of windows:',len_obs)
-        print('> Output prefix is',args.out) 
-        print('> Window size is',args.window_size, 'bp') 
-        print('> Haploid',args.haploid) 
-        print('-' * 40)
-
-        # Find segments and write output
-        segments = DecodeModel(obs, hmm_parameters,max_obs)
-        Write_Decoded_output(args.out, segments, args.demo , window_size = args.window_size)
+        ingroup_individuals = handle_individuals_input(args.ind,'ingroup')
+        os.mkdir(args.out+"/decode")
+        hmm_parameters = create_HMM_parameters_from_file(args.demo,conditional=args.conditional)
+    
+        for individual in ingroup_individuals:
+            (obs,max_obs) =  Load_observations(args.out, individual, args.demo, 1000, haploid= args.haploid,obs_name="obs/obs",conditional=args.conditional)
+            len_obs = 0
+            for key in obs:
+                len_obs+=len(obs[key][0])
+            
+            print('-' * 40)
+            print(hmm_parameters)  
+            print('> number of windows:', len_obs)
+            print('> max observation per window:', max_obs)
+            print('> Output prefix is',args.out+"/decode/") 
+            print('> Window size is',1000, 'bp') 
+            print('> Haploid',args.haploid) 
+            print('> Conditional',args.conditional) 
+            print('-' * 40)
+    
+            # Find segments and write output
+            segments = DecodeModel(obs, hmm_parameters , max_obs)
+            Write_Decoded_output(args.out, segments, args.demo , individual)
 
 
 
@@ -328,10 +335,10 @@ def main():
 
         #decode
         os.mkdir(args.out+"/decode")
-        hmm_parameters = create_HMM_parameters_from_file(args.demo)
+        hmm_parameters = create_HMM_parameters_from_file(args.demo,conditional=args.conditional)
 
         for individual in ingroup_individuals:
-            (obs,max_obs) =  Load_observations(args.out, individual, args.demo, 1000, haploid= args.haploid,obs_name="obs/obs")
+            (obs,max_obs) =  Load_observations(args.out, individual, args.demo, 1000, haploid= args.haploid,obs_name="obs/obs",conditional=args.conditional)
             len_obs = 0
             for key in obs:
                 len_obs+=len(obs[key][0])
@@ -342,7 +349,8 @@ def main():
             print('> max observation per window:', max_obs)
             print('> Output prefix is',args.out+"/decode/") 
             print('> Window size is',1000, 'bp') 
-            print('> Haploid',args.haploid) 
+            print('> Haploid',args.haploid)
+            print('> Conditional',args.conditional)
             print('-' * 40)
     
             # Find segments and write output
