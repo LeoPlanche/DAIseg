@@ -169,6 +169,7 @@ def main():
             for key in obs:
                 len_obs+=len(obs[key][0])
             
+
             print('-' * 40)
             print(hmm_parameters)  
             print('> number of windows:', len_obs)
