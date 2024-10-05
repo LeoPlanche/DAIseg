@@ -64,15 +64,6 @@ L=1000 #Window size for the HMM
 # map_file = 'method/recombmap/genetic_map_GRCh37_chr1.txt'
 # recomb_map = msprime.RateMap.read_hapmap(map_file)
 
-ts = msprime.sim_ancestry({"P2": nbP2,"Af":nbAf,"EAs3": nbEAs3 }, 
-                          ploidy=ploidy, 
-                          sequence_length=seq_len,
-                          recombination_rate=rec_rate, 
-                          #recombination_rate = recomb_map,     
-                          demography=demography,record_migrations=True, random_seed=123456789)
-
-ts = msprime.sim_mutations(ts, rate=mut_rate, random_seed=987654321)    
-
 
 def createObs(cut,ind,p1,p2,p3) -> list:
     tables = ts.dump_tables()
@@ -246,42 +237,53 @@ def printMask(seq_len,fileOut):
         out.write('1\t0\t'+str(seq_len))
         
 M=[]
-    
-for w in range(nbP2*ploidy):
-    #Get the true tracts from msprime
-    tractsD = utils.get_migrating_tracts(ts,"D",w,L)
-    tractsN = utils.get_migrating_tracts(ts,"N",w,L)
-    
-    if len(tractsN)>0 and len(tractsD)>0:
-        tractsAf = utils.substract_tracts([[0,seq_len//1000]],np.concatenate((tractsN, tractsD)))
-    elif len(tractsN)>0:
-        tractsAf = utils.substract_tracts([[0,seq_len//1000]],tractsN)
-    elif len(tractsD)>0:
-        tractsAf = utils.substract_tracts([[0,seq_len//1000]],tractsD)
-    else:
-        tractsAf=[[0,seq_len//1000]]
-    
-    resTrue=[]                                                     
-    for i in range(seq_len//1000):
-        if utils.inTracts(i,tractsD):
-            resTrue.append(2)
-        if utils.inTracts(i,tractsN):
-            resTrue.append(1)
-        if utils.inTracts(i,tractsAf):
-            resTrue.append(0)
+nbExp=10
 
-    #Create observations
-    seq=createObs(L,w,nbP2*ploidy,nbAf*ploidy,nbEAs3*ploidy)
-    #The states of the HMM, 0: Non archaic, 1: Neanderthal, 2: Denisovan
-    states = (0,1,2) 
-    cutoff=0.5
-    S = initS(apN,apD)
-    A = initA(Tan,Tad,rec_rate,L,apN,apD)
-    B = initB(mut_rate,L,Ti,Ta,Tsep,Tn)
-    resV =  HMM.posterior(seq, S, A,B,cutoff)
-    tractsHMM = utils.get_HMM_tracts(resV)
-    #Compute the confusion for the current individual
-    M.append(utils.confusionMatrix(resV,[tractsAf,tractsN,tractsD]))
+for z in nbExp:
+	ts = msprime.sim_ancestry({"P2": nbP2,"Af":nbAf,"EAs3": nbEAs3 }, 
+		                      ploidy=ploidy, 
+		                      sequence_length=seq_len,
+		                      recombination_rate=rec_rate, 
+		                      #recombination_rate = recomb_map,     
+		                      demography=demography,record_migrations=True, random_seed=123456789+z)
+
+	ts = msprime.sim_mutations(ts, rate=mut_rate, random_seed=987654321+z)    
+		
+	for w in range(nbP2*ploidy):
+		#Get the true tracts from msprime
+		tractsD = utils.get_migrating_tracts(ts,"D",w,L)
+		tractsN = utils.get_migrating_tracts(ts,"N",w,L)
+		
+		if len(tractsN)>0 and len(tractsD)>0:
+		    tractsAf = utils.substract_tracts([[0,seq_len//1000]],np.concatenate((tractsN, tractsD)))
+		elif len(tractsN)>0:
+		    tractsAf = utils.substract_tracts([[0,seq_len//1000]],tractsN)
+		elif len(tractsD)>0:
+		    tractsAf = utils.substract_tracts([[0,seq_len//1000]],tractsD)
+		else:
+		    tractsAf=[[0,seq_len//1000]]
+		
+		resTrue=[]                                                     
+		for i in range(seq_len//1000):
+		    if utils.inTracts(i,tractsD):
+		        resTrue.append(2)
+		    if utils.inTracts(i,tractsN):
+		        resTrue.append(1)
+		    if utils.inTracts(i,tractsAf):
+		        resTrue.append(0)
+
+		#Create observations
+		seq=createObs(L,w,nbP2*ploidy,nbAf*ploidy,nbEAs3*ploidy)
+		#The states of the HMM, 0: Non archaic, 1: Neanderthal, 2: Denisovan
+		states = (0,1,2) 
+		cutoff=0.5
+		S = initS(apN,apD)
+		A = initA(Tan,Tad,rec_rate,L,apN,apD)
+		B = initB(mut_rate,L,Ti,Ta,Tsep,Tn)
+		resV =  HMM.posterior(seq, S, A,B,cutoff)
+		tractsHMM = utils.get_HMM_tracts(resV)
+		#Compute the confusion for the current individual
+		M.append(utils.confusionMatrix(resV,[tractsAf,tractsN,tractsD]))
        
         
    
