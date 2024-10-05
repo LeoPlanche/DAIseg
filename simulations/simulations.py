@@ -10,10 +10,7 @@ import os
 from importlib import reload
 from IPython.display import SVG, display
 
-reload(utils)
-reload(HMM)
 
-print("C'est le debut")
 start_time = time.time()
 
 N_DE = 7419
@@ -55,10 +52,10 @@ demography.add_population_split(time=Tn, derived=["N", "D"], ancestral="ND")
 demography.add_population_split(time=Ta, derived=["S", "ND"], ancestral="O")
 
 
-nbAf = 300
-nbEAs3 = 300
-nbP2 = 10
-seq_len=20000000
+nbAf = 150
+nbEAs3 = 150
+nbP2 = 20
+seq_len=250000000
 rec_rate =1.2e-9
 mut_rate=1.25e-8
 ploidy=2
@@ -250,7 +247,7 @@ def printMask(seq_len,fileOut):
         
 M=[]
     
-for w in range(nbP2*2):
+for w in range(nbP2*ploidy):
     #Get the true tracts from msprime
     tractsD = utils.get_migrating_tracts(ts,"D",w,L)
     tractsN = utils.get_migrating_tracts(ts,"N",w,L)
