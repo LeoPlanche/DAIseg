@@ -41,9 +41,7 @@ The list of samples is also given as a .json file. For each population, a list o
 
 ```
 {
- "ingroup":[
-  {"name": "Eurasian", "ind": ["HG00096","HG00097","HG00099","HG00100","HG00101","HG00102","HG00103"]}
- ],
+ "ingroup":["HG00096","HG00097","HG00099","HG00100","HG00101","HG00102","HG00103"],
 "outgroup":[
  {"name":"African", "ind": ["NA18486","NA18488","NA18499","NA18501","NA18502","NA18504","NA18505","NA18507","NA18508"]}
 }
