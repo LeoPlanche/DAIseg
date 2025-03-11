@@ -8,10 +8,13 @@ HMM-MID is an Hidden Markov Model for Local Ancestry Introgression (LAI). It was
 The user needs to provide a demograhic model, a list of samples, the associated bcf files and callability file.
 
 The demography is in a .json file and closely written as in [msprime](https://tskit.dev/msprime/docs/stable/demography.html), it contains:
- - A list of populations, `pop`, each population can take attributes `outgroup`, `ingroup` or `ancestral`. Attributes `outgroup` and `ingroup` are incompatible with each other, but a population may have both attribute `ancestral` and `ingroup` or `outgroup`. Actually to define the non admixed ancestry, it is necessary to add attribute `ancestral` to the population with attribute `ingroup`.
+ - A list of populations, `pop`, each population can take attributes `outgroup`, `ingroup` or `ancestral`. Attributes `outgroup` and `ingroup` are incompatible with each other, but a population may have both attribute `ancestral` and `ingroup` or `outgroup`. To define the non admixed ancestry, it is necessary to add attribute `ancestral` to the population with attribute `ingroup`.
    
-   Let us give two quick examples.
-   To detect Neanderthal, Denisovan and non introgressed segments in Papuans, the `outgroup` populations would be Africans and Eurasians (see [cite]), the `ingroup` would be Papuans and the `ancestral` Neanderthal, Denisovan and Papuans (non introgressed). To detect Neanderthal and non introgressed segments in modern europeans, the `outgroup` populations could be Africans and Neanderthals (see [citeAnna]), the `ingroup` modern Europeans and the `ancestral` Neanderthal and modern Europeans.
+   Let us give two quick examples:
+   
+   To detect Neanderthal, Denisovan and non introgressed segments in Papuans, the `outgroup` populations would be Africans and Eurasians (see [cite]), the `ingroup` would be Papuans and the `ancestral` Neanderthal, Denisovan and Papuans (non introgressed).
+   
+   To detect Neanderthal and non introgressed segments in modern europeans, the `outgroup` populations could be Africans and Neanderthals (see [Planche et al. 2024](https://link.springer.com/article/10.1134/S1995080224602959)), the `ingroup` modern Europeans and the `ancestral` Neanderthal and modern Europeans.
  - A list of admixtures, `admixture`, containing attributes `time`, the time of admixture, `derived`, the population resulting from admixture, `ancestral`, a list of the two populations which admixed together, and `proportions`, a list of two number, corresponding to the admixture proportion of each of the two ancestral populations.
  - A list of split, `split`, containing attributes `time`, the time of split, `derived`, a list of the two populations resulting from the split, `ancestral`, the population which split into the two derived ones.
 
@@ -41,9 +44,7 @@ The list of samples is also given as a .json file. For each population, a list o
 
 ```
 {
- "ingroup":[
-  {"name": "Eurasian", "ind": ["HG00096","HG00097","HG00099","HG00100","HG00101","HG00102","HG00103"]}
- ],
+ "ingroup":["HG00096","HG00097","HG00099","HG00100","HG00101","HG00102","HG00103"],
 "outgroup":[
  {"name":"African", "ind": ["NA18486","NA18488","NA18499","NA18501","NA18502","NA18504","NA18505","NA18507","NA18508"]}
 }
