@@ -527,12 +527,10 @@ def combined_files(ancestralfiles, vcffiles):
     else:
         sys.exit('Could not resolve ancestral files and vcffiles (try comma separated values)')
 
-#Get the for population state, the time it split from each population. Here the split can be an admixture event.
+#Get for population state, the time it split from each population. Here the split can be an admixture event.
 def get_split_times_recombination(state, data, ref):
     times=[]
-    for pop in  (pop for pop in data["pop"] if "ingroup" in pop["type"] ):
-        ingroup_name=pop["name"]
-    ancestries_state = get_ancestries(state,data)   #Is it correct
+    ancestries_state = get_ancestries(state,data)
     for outgroup in  (outgroup for outgroup in data["pop"] if ref in outgroup["type"] ):
         ancestries_outgtoup=get_ancestries(outgroup["name"],data)
         times.append(get_most_recent_ancestor(ancestries_state,ancestries_outgtoup))

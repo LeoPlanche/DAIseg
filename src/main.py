@@ -85,11 +85,6 @@ def main():
 
     subparser = parser.add_subparsers(dest = 'mode')
 
-    # Run test
-    test_subparser = subparser.add_parser('make_test_data', help='Create test data')
-    test_subparser.add_argument("-windows", metavar='',help="Number of Kb windows to create (defaults to 50,000)", type=int, default = 50000)
-    test_subparser.add_argument("-nooutfiles",help="Don't create obs.txt, mutrates.bed, weights.bed, Initialguesses.json (defaults to yes)", action='store_false', default = True)
-
     # Make outgroup
     outgroup_subparser = subparser.add_parser('create_outgroup', help='Create outgroup information')
     outgroup_subparser.add_argument("-ind",help="[required] ingroup/outgrop list (json file) or comma-separated list e.g. ind1,ind2", type=str, required = True)
@@ -147,16 +142,10 @@ def main():
 
     args = parser.parse_args()
 
-    # Make test data
-    # ------------------------------------------------------------------------------------------------------------
-    if args.mode == 'make_test_data':
-        create_test_data(data_set_length = args.windows, write_out_files = args.nooutfiles)
-
-
 
     # Decode observations using parameters
     # ------------------------------------------------------------------------------------------------------------
-    elif args.mode == 'decode':
+    if args.mode == 'decode':
 
         #obs, chroms, starts, variants, mutrates, weights  = Load_observations_weights_mutrates(args.obs, args.weights, args.mutrates, args.window_size, args.haploid)
         ingroup_individuals = handle_individuals_input(args.ind,'ingroup')
@@ -183,9 +172,6 @@ def main():
             # Find segments and write output
             segments = DecodeModel(obs, hmm_parameters , max_obs)
             Write_Decoded_output(args.out, segments, args.demo , individual)
-
-
-
 
 
     # Create outgroup snps (set of snps to be removed)
@@ -219,8 +205,6 @@ def main():
             make_out_group(outgroup["ind"], args.weights, vcffiles, args.out+"/outgroup."+outgroup["name"], ancestralfiles, refgenomefiles)
 
 
-
-
     # Create ingroup observations
     # ------------------------------------------------------------------------------------------------------------
     elif args.mode == 'create_ingroup':
@@ -248,8 +232,6 @@ def main():
     
     
             make_ingroup_obs(ingroup_individuals, args.weights, vcffiles, args.out, args.outgroup+"/"+filename, ancestralfiles)
-
-
 
 
     # Estimate mutation rate
