@@ -171,7 +171,6 @@ def Write_Decoded_output(outputprefix, segments, filename , ind="" , window_size
             for ploidy in segments[chrom]:
                 curr=segments[chrom][ploidy]
                 start=0
-                state=curr[0]
                 for i in range(1,len(curr)):
                     if curr[i]!=curr[i-1]:
                         out.write(f'{chrom}\t{start*window_size}\t{(i-1)*window_size}\t{i-start}\t{states_name[curr[i-1]]}\n')

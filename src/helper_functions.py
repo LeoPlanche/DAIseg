@@ -56,7 +56,6 @@ def Load_observations(obs_file, ind, demo_file, window_size = 1000, haploid = Tr
     with open(demo_file) as json_file:
         data = json.load(json_file)
     obs_counter = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list))))
-    haplotypes = defaultdict(int)
     outgroup_name = []
     state_names = []
     obs= {}

@@ -1,12 +1,8 @@
 import msprime
-import tskit
 import utils
-import HMMS
 import HMM
 import numpy as np
 import time
-import sys
-import os
 from importlib import reload
 from IPython.display import SVG, display
 
@@ -239,51 +235,53 @@ def printMask(seq_len,fileOut):
 M=[]
 nbExp=10
 
-for z in nbExp:
-	ts = msprime.sim_ancestry({"P2": nbP2,"Af":nbAf,"EAs3": nbEAs3 }, 
+for z in range(nbExp):
+    ts = msprime.sim_ancestry({"P2": nbP2,"Af":nbAf,"EAs3": nbEAs3 }, 
 		                      ploidy=ploidy, 
 		                      sequence_length=seq_len,
 		                      recombination_rate=rec_rate, 
 		                      #recombination_rate = recomb_map,     
 		                      demography=demography,record_migrations=True, random_seed=123456789+z)
 
-	ts = msprime.sim_mutations(ts, rate=mut_rate, random_seed=987654321+z)    
-		
-	for w in range(nbP2*ploidy):
+    ts = msprime.sim_mutations(ts, rate=mut_rate, random_seed=987654321+z)    
+
+    allTractsN = utils.extract_introgressed_tracts(utils.find_introgressed_trees(ts,Tan,'N','P2'))
+    allTractsD = utils.extract_introgressed_tracts(utils.find_introgressed_trees(ts,Tad,'D','P2'))
+    	
+    for w in range(nbP2*ploidy):
 		#Get the true tracts from msprime
-		tractsD = utils.get_migrating_tracts(ts,"D",w,L)
-		tractsN = utils.get_migrating_tracts(ts,"N",w,L)
+        tractsD = ((allTractsD[allTractsD['hap_id'] == w])[['start', 'end']] // 1000).astype(int).values.tolist()
+        tractsN = ((allTractsN[allTractsN['hap_id'] == w])[['start', 'end']] // 1000).astype(int).values.tolist()
+        if len(tractsN)>0 and len(tractsD)>0:
+            tractsAf = utils.substract_tracts([[0,seq_len//1000]],np.concatenate((tractsN, tractsD)))
+        elif len(tractsN)>0:
+            tractsAf = utils.substract_tracts([[0,seq_len//1000]],tractsN)
+        elif len(tractsD)>0:
+            tractsAf = utils.substract_tracts([[0,seq_len//1000]],tractsD)
+        else:
+            tractsAf=[[0,seq_len//1000]]
 		
-		if len(tractsN)>0 and len(tractsD)>0:
-		    tractsAf = utils.substract_tracts([[0,seq_len//1000]],np.concatenate((tractsN, tractsD)))
-		elif len(tractsN)>0:
-		    tractsAf = utils.substract_tracts([[0,seq_len//1000]],tractsN)
-		elif len(tractsD)>0:
-		    tractsAf = utils.substract_tracts([[0,seq_len//1000]],tractsD)
-		else:
-		    tractsAf=[[0,seq_len//1000]]
-		
-		resTrue=[]                                                     
-		for i in range(seq_len//1000):
-		    if utils.inTracts(i,tractsD):
-		        resTrue.append(2)
-		    if utils.inTracts(i,tractsN):
-		        resTrue.append(1)
-		    if utils.inTracts(i,tractsAf):
-		        resTrue.append(0)
+        resTrue=[]                                                     
+        for i in range(seq_len//1000):
+            if utils.inTracts(i,tractsD):
+                resTrue.append(2)
+            if utils.inTracts(i,tractsN):
+                resTrue.append(1)
+            if utils.inTracts(i,tractsAf):
+                resTrue.append(0)
 
 		#Create observations
-		seq=createObs(L,w,nbP2*ploidy,nbAf*ploidy,nbEAs3*ploidy)
+        seq=createObs(L,w,nbP2*ploidy,nbAf*ploidy,nbEAs3*ploidy)
 		#The states of the HMM, 0: Non archaic, 1: Neanderthal, 2: Denisovan
-		states = (0,1,2) 
-		cutoff=0.5
-		S = initS(apN,apD)
-		A = initA(Tan,Tad,rec_rate,L,apN,apD)
-		B = initB(mut_rate,L,Ti,Ta,Tsep,Tn)
-		resV =  HMM.posterior(seq, S, A,B,cutoff)
-		tractsHMM = utils.get_HMM_tracts(resV)
+        states = (0,1,2) 
+        cutoff=0.5
+        S = initS(apN,apD)
+        A = initA(Tan,Tad,rec_rate,L,apN,apD)
+        B = initB(mut_rate,L,Ti,Ta,Tsep,Tn)
+        resV =  HMM.posterior(seq, S, A,B,cutoff)
+        tractsHMM = utils.get_HMM_tracts(resV)
 		#Compute the confusion for the current individual
-		M.append(utils.confusionMatrix(resV,[tractsAf,tractsN,tractsD]))
+        M.append(utils.confusionMatrix(resV,[tractsAf,tractsN,tractsD]))
        
         
    
