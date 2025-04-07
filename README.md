@@ -27,7 +27,7 @@ Here is a simple example, which corresponds to the detection of Neanderthal in m
     {"name": "Sapiens", "type":[]},
     {"name": "Neanderthal", "type":["ancestral"]},
     {"name": "African", "type":["outgroup"]},
-    {"name": "Eurasian_before_admixture", "type":[]}
+    {"name": "Eurasian_before_admixture", "type":[]},
     {"name": "Eurasian", "type":["ingroup","ancestral"]}
   ],
   "admixture":[
