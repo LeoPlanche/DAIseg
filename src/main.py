@@ -11,77 +11,12 @@ from make_mutationrate import make_mutation_rate
 from helper_functions import Load_observations_weights_mutrates, handle_individuals_input, handle_infiles, combined_files, Load_observations
 
 
-VERSION = '0.6.9'
-
-
-def print_script_usage():
-    toprint = f'''
-Script for identifying introgressed archaic segments (version: {VERSION})
-
-> Turorial:
-hmmix make_test_data 
-hmmix train  -obs=obs.txt -weights=weights.bed -mutrates=mutrates.bed -param=Initialguesses.json -out=trained.json 
-hmmix decode -obs=obs.txt -weights=weights.bed -mutrates=mutrates.bed -param=trained.json
-
-
-Different modes (you can also see the options for each by writing hmmix make_test_data -h):
-> make_test_data        
-    -windows            Number of Kb windows to create (defaults to 50,000)
-    -nooutfiles         Don't create obs.txt, mutrates.bed, weights.bed, Initialguesses.json (defaults to yes)
-
-> mutation_rate         
-    -outgroup           [required] path to variants found in outgroup
-    -out                outputfile (defaults to mutationrate.bed)
-    -weights            file with callability (defaults to all positions being called)
-    -window_size        size of bins (defaults to 1 Mb)
-
-> create_outgroup       
-    -ind                [required] ingroup/outgrop list (json file) or comma-separated list e.g. ind1,ind2
-    -vcf                [required] path to list of comma-separated vcf/bcf file(s) or wildcard characters e.g. chr*.bcf
-    -weights            file with callability (defaults to all positions being called)
-    -out                outputfile (defaults to stdout)
-    -ancestral          fasta file with ancestral information - comma-separated list or wildcards like vcf argument (default none)
-    -refgenome          fasta file with reference genome - comma-separated list or wildcards like vcf argument (default none)
-
-> create_ingroup        
-    -ind                [required] ingroup/outgrop list (json file) or comma-separated list e.g. ind1,ind2
-    -vcf                [required] path to list of comma-separated vcf/bcf file(s) or wildcard characters e.g. chr*.bcf
-    -outgroup           [required] path to variant found in outgroup
-    -weights            file with callability (defaults to all positions being called)
-    -out                outputfile prefix (default is a file named obs.<ind>.txt where ind is the name of individual in ingroup/outgrop list)
-    -ancestral          fasta file with ancestral information - comma-separated list or wildcards like vcf argument (default none)
-
-> train                 
-    -obs                [required] file with observation data
-    -weights            file with callability (defaults to all positions being called)
-    -mutrates           file with mutation rates (default is mutation rate is uniform)
-    -param              markov parameters file (default is human/neanderthal like parameters)
-    -out                outputfile (default is a file named trained.json)
-    -window_size        size of bins (default is 1000 bp)
-    -haploid            Change from using diploid data to haploid data (default is diploid)
-
-> decode                
-    -obs                [required] directory with observation data
-    -ind                individual to decode
-    -demo               demographic model
-    -weights            file with callability (defaults to all positions being called)
-    -mutrates           file with mutation rates (default is mutation rate is uniform)
-    -param              markov parameters file (default is human/neanderthal like parameters)
-    -out                outputfile prefix <out>.hap1.txt and <out>.hap2.txt if -haploid option is used or <out>.diploid.txt (default is stdout)
-    -window_size        size of bins (default is 1000 bp)
-    -haploid            Change from using diploid data to haploid data (default is diploid)
-    -admixpop ADMIXPOP  Annotate using vcffile with admixing population (default is none)
-    -extrainfo          Add variant position for each SNP (default is off)
-    '''
-
-    return toprint
-
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Main
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 def main():
 
-    parser = argparse.ArgumentParser(description=print_script_usage(), formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 
     subparser = parser.add_subparsers(dest = 'mode')
 
@@ -124,7 +59,7 @@ def main():
     decode_subparser.add_argument("-admixpop",help="Annotate using vcffile with admixing population (default is none)")
     decode_subparser.add_argument("-extrainfo",help="Add archaic information on each SNP", action='store_true', default = False)
     decode_subparser.add_argument("-conditional",help="Use conditional probability (default is False)", action='store_true', default = False)
-
+    decode_subparser.add_argument("-posterior",help="Use Posterior Decoding (default is False and Viterbi is used)", action='store_true', default = False)
     # all model
     all_subparser = subparser.add_parser('all', help='Run HMM from beginning to end')
     all_subparser.add_argument("-ind",help="[required] ingroup/outgrop list (json file) or comma-separated list e.g. ind1,ind2", type=str, required = True)
@@ -137,6 +72,7 @@ def main():
     all_subparser.add_argument("-refgenome", metavar='',help="fasta file with reference genome - comma-separated list or wildcards like vcf argument (default none)", default='')
     all_subparser.add_argument("-haploid",help="Change from using diploid data to haploid data (default is diploid)", action='store_true', default = False)
     all_subparser.add_argument("-conditional",help="Use conditional probability (default is False)", action='store_true', default = False)
+    all_subparser.add_argument("-posterior",help="Use Posterior Decoding (default is False and Viterbi is used)", action='store_true', default = False)
     
     
 
@@ -167,10 +103,11 @@ def main():
             print('> Window size is',1000, 'bp') 
             print('> Haploid',args.haploid) 
             print('> Conditional',args.conditional) 
+            print('> Decode:','Posterior Decoding' if args.posterior else 'Viterbi')
             print('-' * 40)
     
             # Find segments and write output
-            segments = DecodeModel(obs, hmm_parameters , max_obs)
+            segments = DecodeModel(obs, hmm_parameters , max_obs, args.posterior)
             Write_Decoded_output(args.out, segments, args.demo , individual)
 
 
@@ -334,16 +271,12 @@ def main():
             print('> Window size is',1000, 'bp') 
             print('> Haploid',args.haploid)
             print('> Conditional',args.conditional)
+            print('> Decode:','Posterior Decoding' if args.posterior else 'Viterbi')
             print('-' * 40)
     
             # Find segments and write output
-            segments = DecodeModel(obs, hmm_parameters , max_obs)
+            segments = DecodeModel(obs, hmm_parameters , max_obs, args.posterior) 
             Write_Decoded_output(args.out, segments, args.demo , individual)
-
-    # Print usage
-    # ------------------------------------------------------------------------------------------------------------
-    else:
-        print(print_script_usage())
 
 
 if __name__ == "__main__":

@@ -138,7 +138,7 @@ def logoutput(hmm_parameters, loglikelihood, iteration):
 # Decode
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-def DecodeModel(obs, hmm_parameters, max_obs):
+def DecodeModel(obs, hmm_parameters, max_obs, posterior_decoding=False):
    
     mut_rate=1.25e-8
     B = initB(hmm_parameters.emissions, mut_rate,max_obs)
@@ -146,7 +146,10 @@ def DecodeModel(obs, hmm_parameters, max_obs):
     for chrom in obs:
         segments[chrom]={}
         for i in range(len(obs[chrom])):
-            segments[chrom][i] = viterbi(obs[chrom][i], hmm_parameters.starting_probabilities, hmm_parameters.transitions , B, max_obs) 
+            if posterior_decoding:
+                segments[chrom][i] = posterior(obs[chrom][i], hmm_parameters.starting_probabilities, hmm_parameters.transitions , B, max_obs, cutoff=0.5) 
+            else:
+                segments[chrom][i] = viterbi(obs[chrom][i], hmm_parameters.starting_probabilities, hmm_parameters.transitions , B, max_obs) 
     return segments
 
 
@@ -285,5 +288,89 @@ def viterbi(V, initial_distribution, a, b, max_obs):
  
     return result
 
+
+def initialize_matrix(dim1,dim2,value=0):
+    F = []
+    for i in range(0,dim1):
+        F.append([])
+        for j in range(0,dim2):
+            F[i].append(value)
+    return F
+     
+def posterior(sequence,start,transitions,emissions,max_obs,cutoff=0.5):
+    res = initialize_matrix(len(start),len(sequence))
+    f=forwardlog(sequence,start,transitions,emissions,max_obs)
+    b=backwardlog(sequence,start,transitions,emissions,max_obs)
+    for i in range(0,len(start)):
+        for j in range(0,len(sequence)):
+            res[i][j]=np.exp(f[i][j+1]+b[i][j+1]-f[-1][-1])
+            
+    seq=[]
+    for i in range(len(res[0])):
+        b=True
+        sum=0
+        if res[1][i]+res[2][i]>cutoff:
+            seq.append(np.argmax([res[0][i],res[1][i],res[2][i]]))
+        else:
+            seq.append(0)
         
-    
+    return seq
+            
+
+def forwardlog(sequence,start,transitions,emissions,max_obs):
+    M = transitions.shape[0]
+    F = initialize_matrix(len(start),len(sequence)+2)
+    F[0][0] = 1
+    for i in range(0,len(start)):
+        F[i][1] = np.log(start[i])+np.log(emissions[i,obs_to_ind(sequence[0][i],M,max_obs)])
+    for j in range(2,len(sequence)+1):
+        for i in range(0,len(start)):
+            p_sum = 0
+            sA = []
+            for k in range(0,len(start)):
+                if  transitions[k,i]*emissions[i,obs_to_ind(sequence[j-1][i],M,max_obs)]==0:
+                     p_sum +=0
+                else:
+                    sA.append(F[k][j-1]+np.log(transitions[k,i])+np.log(emissions[i, obs_to_ind(sequence[j-1][i],M,max_obs)]))
+                   
+                    
+            for  q in range(0,len(sA)):     
+                p_sum += np.exp(sA[q]-max(sA))                      
+            F[i][j] = np.log(p_sum)+max(sA)
+    p_sum = 0
+    sA = []
+    for k in range(0,len(start)):
+        sA.append(F[k][len(sequence)])
+    for  q in range(0,len(sA)):     
+        p_sum += np.exp(sA[q]-max(sA))  
+    F[-1][-1] = np.log(p_sum)+max(sA)
+    return F
+
+def backwardlog(sequence,start,transitions,emissions,max_obs):
+    M = transitions.shape[0]
+    F = initialize_matrix(len(start),len(sequence)+1)
+    for i in range(0,len(start)):
+        F[i][-1] = 0
+    for j in range(len(sequence)-1,0,-1): 
+        for i in range(0,len(start)):
+            p_sum = 0
+            sA=[]
+            for k in range(0,len(start)):
+                if transitions[i,k]*emissions[k, obs_to_ind(sequence[j][k],M,max_obs)] ==0:
+                    p_sum=0
+                else:
+                    sA.append(F[k][j+1]+np.log(transitions[i,k])+np.log(emissions[k,obs_to_ind(sequence[j][k],M,max_obs)]))
+            for  q in range(0,len(sA)):     
+                p_sum += np.exp(sA[q]-max(sA))                      
+            F[i][j] = np.log(p_sum)+max(sA)      
+    p_sum = 0
+    sA=[]
+    for k in range(0,len(start)):
+        if start[k]*emissions[k,obs_to_ind(sequence[0][k],M,max_obs)] == 0:
+            p_sum +=0
+        else:
+            sA.append(F[k][1]+np.log(start[k]*emissions[k,obs_to_ind(sequence[0][k],M,max_obs)]))
+    for  q in range(0,len(sA)):     
+         p_sum += np.exp(sA[q]-max(sA)) 
+    F[0][0] = np.log(p_sum)+max(sA)
+    return F
