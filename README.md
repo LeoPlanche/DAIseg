@@ -59,9 +59,11 @@ The callability file should be given as a .bed file.
 Simply run:
 
 ```
-./main.py all  -demo=<demographic>.json -ind=<sample list>.json -vcfIn=<data for all samples in the ingroup>.bcf -vcfOut=<data for all samples in the outgroups>.bcf -weights=<mask>.bed -out=<out directory>
+./main.py all  -demo <demographic>.json -ind <sample list>.json -vcfIn <data for all samples in the ingroup>.bcf -vcfOut <data for all samples in the outgroups>.bcf -weights <mask>.bed -out=<out directory>
 ```
 If the data is unphased add option `-haploid`.
+
+The default decoding algorithm used is Viterbi, add option `-posterior` to use Posterior Decoding.
 
 The bcf files for the ingroup and outgroup can be the same.
 The segments can be found for each individuals in:
