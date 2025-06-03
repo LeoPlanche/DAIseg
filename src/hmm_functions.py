@@ -29,7 +29,7 @@ class HMMParam:
         
 # Read HMM parameters from a json file
 def create_HMM_parameters_from_file(filename,conditional=False):
-    rec_rate =1.2e-9
+    rec_rate =1.2e-8
 
     with open(filename) as json_file:
         data = json.load(json_file)
