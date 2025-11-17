@@ -35,7 +35,7 @@ Here is a simple example, which corresponds to the detection of Neanderthal in m
   ], 
   "split":[
     {"time":2000,"derived":["African", "Eurasian_before_admixture"],"ancestral":"Sapiens"},
-    {"time":30000,"derived":["Sapiens", "Neanderthal"],"ancestral":"O"}
+    {"time":30000,"derived":["Sapiens", "Neanderthal"],"ancestral":"Origin"}
   ]
 }
 ```
