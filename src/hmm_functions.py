@@ -10,11 +10,12 @@ from helper_functions import  Annotate_with_ref_genome, Make_folder_if_not_exist
 # HMM Parameter Class
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 class HMMParam:
-    def __init__(self, state_names, starting_probabilities, transitions, emissions): 
+    def __init__(self, state_names, starting_probabilities, transitions, emissions, default_state=0): 
         self.state_names = np.array(state_names)
         self.starting_probabilities = np.array(starting_probabilities)
         self.transitions = np.array(transitions)
         self.emissions = np.array(emissions)
+        self.default_state = default_state # index of the ingroup (non admixed) state
 
 
     def __str__(self):
@@ -96,17 +97,21 @@ def create_HMM_parameters_from_file(filename,conditional=False):
                 
     for i in range(len(state_names)):
         transitions[i][i]=1-sum(transitions[i])
-        
+
+    if ingroup_name not in state_names:
+        raise ValueError(f'The ingroup population {ingroup_name} must also have type "ancestral" in {filename}')
+
     return HMMParam(state_names=state_names,
                     starting_probabilities=starting_probabilities,
                     transitions=transitions,
-                    emissions=emissions)
+                    emissions=emissions,
+                    default_state=state_names.index(ingroup_name))
 
 
 
 # Save HMMParam to a json file
 def write_HMM_to_file(hmmparam, outfile):
-    data = {key: value.tolist() for key, value in vars(hmmparam).items()}
+    data = {key: value.tolist() if isinstance(value, np.ndarray) else value for key, value in vars(hmmparam).items()}
     json_string = json.dumps(data, indent = 2) 
     with open(outfile, 'w') as out:
         out.write(json_string)
@@ -147,7 +152,7 @@ def DecodeModel(obs, hmm_parameters, max_obs, posterior_decoding=False):
         segments[chrom]={}
         for i in range(len(obs[chrom])):
             if posterior_decoding:
-                segments[chrom][i] = posterior(obs[chrom][i], hmm_parameters.starting_probabilities, hmm_parameters.transitions , B, max_obs, cutoff=0.5) 
+                segments[chrom][i] = posterior(obs[chrom][i], hmm_parameters.starting_probabilities, hmm_parameters.transitions , B, max_obs, cutoff=0.5, default_state=hmm_parameters.default_state) 
             else:
                 segments[chrom][i] = viterbi(obs[chrom][i], hmm_parameters.starting_probabilities, hmm_parameters.transitions , B, max_obs) 
     return segments
@@ -275,18 +280,7 @@ def viterbi(V, initial_distribution, a, b, max_obs):
     # Flip the path array since we were backtracking
     S = np.flip(S, axis=0)
  
-    # Convert numeric values to actual hidden states
- 
-    result = []
-    for s in S:
-        if s == 0:
-            result.append(0)
-        elif s == 1:
-            result.append(1)
-        elif s == 2:
-            result.append(2)
- 
-    return result
+    return S.astype(int).tolist()
 
 
 def initialize_matrix(dim1,dim2,value=0):
@@ -297,7 +291,7 @@ def initialize_matrix(dim1,dim2,value=0):
             F[i].append(value)
     return F
      
-def posterior(sequence,start,transitions,emissions,max_obs,cutoff=0.5):
+def posterior(sequence,start,transitions,emissions,max_obs,cutoff=0.5,default_state=0):
     res = initialize_matrix(len(start),len(sequence))
     f=forwardlog(sequence,start,transitions,emissions,max_obs)
     b=backwardlog(sequence,start,transitions,emissions,max_obs)
@@ -305,14 +299,13 @@ def posterior(sequence,start,transitions,emissions,max_obs,cutoff=0.5):
         for j in range(0,len(sequence)):
             res[i][j]=np.exp(f[i][j+1]+b[i][j+1]-f[-1][-1])
             
+    # A window is assigned to the most likely state if the probability of not being in the ingroup state is above cutoff
     seq=[]
     for i in range(len(res[0])):
-        b=True
-        sum=0
-        if res[1][i]+res[2][i]>cutoff:
-            seq.append(np.argmax([res[0][i],res[1][i],res[2][i]]))
+        if 1-res[default_state][i]>cutoff:
+            seq.append(int(np.argmax([res[k][i] for k in range(len(start))])))
         else:
-            seq.append(0)
+            seq.append(default_state)
         
     return seq
             
