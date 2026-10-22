@@ -4,7 +4,12 @@ from numba import njit
 import json
 import math
 
-from helper_functions import  Annotate_with_ref_genome, Make_folder_if_not_exists, flatten_list, get_split_times, get_ancestral_proportion, get_most_recent_ancestor, get_ancestries, get_split_times_recombination
+from helper_functions import  Annotate_with_ref_genome, Make_folder_if_not_exists, flatten_list, get_split_times, get_ancestral_proportion, get_most_recent_ancestor, get_ancestries, get_split_times_recombination, require_conditional_order
+
+# Shortest coalescence time (generations) an emission class may be given. With conditional emissions two outgroups
+# of a state can share a coalescence time, and the class between them would otherwise get rate exactly 0, i.e.
+# probability 0 for any count >= 1 -- a single private variant would make that state impossible in the window.
+MIN_COALESCENCE_TIME = 1.0
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 # HMM Parameter Class
@@ -51,20 +56,22 @@ def create_HMM_parameters_from_file(filename,conditional=False):
         state_names.append(state["name"])
 
     if conditional:
+        #one ordering of the outgroups, shared by every state, as Load_observations uses to classify the variants
+        order = require_conditional_order(data)
         for state in state_names:
-            starting_probabilities.append(get_ancestral_proportion(state,data))        
+            starting_probabilities.append(get_ancestral_proportion(state,data))
             emissions.append([])
             times = get_split_times(state,data,"outgroup")
             for i in range(len(outgroup_name)):
-                ancestries_ingroup = get_ancestries(ingroup_name,data)   
-                ancestries_outgtoup = get_ancestries(outgroup_name[i],data)   
+                ancestries_ingroup = get_ancestries(ingroup_name,data)
+                ancestries_outgtoup = get_ancestries(outgroup_name[i],data)
                 times[i] = max(times[i],get_most_recent_ancestor(ancestries_ingroup,ancestries_outgtoup))
-            
-            times.sort(reverse=True)
+
+            times = [times[i] for i in order]
             for i in range(len(times)-1):
-                emissions[-1].append((times[i]-times[i+1])*1000)
-            emissions[-1].append(times[-1]*1000)
-            
+                emissions[-1].append(max(times[i]-times[i+1],MIN_COALESCENCE_TIME)*1000)
+            emissions[-1].append(max(times[-1],MIN_COALESCENCE_TIME)*1000)
+
         for i in range(len(starting_probabilities)):
             if starting_probabilities[i]==1:
                 starting_probabilities[i]=2-sum(starting_probabilities)
@@ -77,7 +84,7 @@ def create_HMM_parameters_from_file(filename,conditional=False):
                 ancestries_ingroup = get_ancestries(ingroup_name,data)   
                 ancestries_outgtoup = get_ancestries(outgroup_name[i],data)   
                 times[i] = max(times[i],get_most_recent_ancestor(ancestries_ingroup,ancestries_outgtoup))
-                emissions[-1].append(times[i]*1000)
+                emissions[-1].append(max(times[i],MIN_COALESCENCE_TIME)*1000)
             
         for i in range(len(starting_probabilities)):
             if starting_probabilities[i]==1:

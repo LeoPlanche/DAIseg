@@ -8,7 +8,7 @@ from hmm_functions import  DecodeModel, write_HMM_to_file, create_HMM_parameters
 from bcf_vcf import make_out_group, make_ingroup_obs
 #from make_test_data import create_test_data
 from make_mutationrate import make_mutation_rate
-from helper_functions import Load_observations_weights_mutrates, handle_individuals_input, handle_infiles, combined_files, Load_observations
+from helper_functions import Load_observations_weights_mutrates, handle_individuals_input, handle_infiles, combined_files, Load_observations, resolve_conditional
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -78,6 +78,8 @@ def main():
 
     args = parser.parse_args()
 
+    if getattr(args, 'conditional', False):
+        args.conditional = resolve_conditional(args.conditional, args.demo)
 
     # Decode observations using parameters
     # ------------------------------------------------------------------------------------------------------------

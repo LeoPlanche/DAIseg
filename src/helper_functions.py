@@ -89,23 +89,10 @@ def Load_observations(obs_file, ind, demo_file, window_size = 1000, haploid = Tr
     posMax= {}
     ####
     if conditional:
-        times={}
-        ancestral={}
-        
-        for state in state_names:
-            ancestries={}
-            times = get_split_times(state,data,"outgroup")
-            for i in range(len(outgroup_name)):
-                ancestries_ingroup = get_ancestries(ingroup_name,data)   
-                ancestries_outgtoup = get_ancestries(outgroup_name[i],data)   
-                times[i] = max(times[i],get_most_recent_ancestor(ancestries_ingroup,ancestries_outgtoup))
-                ancestries[outgroup_name[i]]=times[i]
-            ancestries = sorted(ancestries.items(), key=lambda x:x[1], reverse = True)
-            ancestral[state]=[]
-            for key in ancestries:
-                ancestral[state].append(key[0])
-        
-    ####   
+        order = require_conditional_order(data)
+        ancestral = {state: [outgroup_name[i] for i in order] for state in state_names}
+
+    ####
     
     for chrom in obs_counter:
         maxi=-1
@@ -602,6 +589,63 @@ def get_ancestries(state,data,admix=True):
                     b=True
     
     return ancestries_state
+
+#For each ancestral state and each outgroup, the coalescence-time bound used by the emissions.
+def emission_time_matrix(data):
+    state_names = [pop["name"] for pop in data["pop"] if "ancestral" in pop["type"]]
+    outgroup_name = [pop["name"] for pop in data["pop"] if "outgroup" in pop["type"]]
+    for pop in (pop for pop in data["pop"] if "ingroup" in pop["type"] ):
+        ingroup_name=pop["name"]
+    ancestries_ingroup = get_ancestries(ingroup_name,data)
+    times=[]
+    for state in state_names:
+        row = get_split_times(state,data,"outgroup")
+        for i in range(len(outgroup_name)):
+            row[i] = max(row[i],get_most_recent_ancestor(ancestries_ingroup,get_ancestries(outgroup_name[i],data)))
+        times.append(row)
+    return state_names, outgroup_name, times
+
+#The conditional emissions need ONE ordering of the outgroups, used by every state: along it the coalescence times
+#of each ancestry must decrease, otherwise a Poisson rate would be negative. Sorting the outgroups separately for
+#each state instead would make each state count a different subset of the variants, so their likelihoods would not
+#be comparable and the decoding is meaningless. See supplementary S1 of the article.
+#Returns the ordering as indices into the outgroup list, or None when the demography admits none.
+def conditional_order(data):
+    state_names, outgroup_name, times = emission_time_matrix(data)
+    n = len(outgroup_name)
+    for order in itertools.permutations(range(n)):
+        if all(all(row[order[k]] >= row[order[k+1]] for k in range(n-1)) for row in times):
+            return list(order)
+    return None
+
+#Same, for the callers that cannot continue without one (main.py resolves the fallback before reaching them).
+def require_conditional_order(data):
+    order = conditional_order(data)
+    if order is None:
+        state_names, outgroup_name, times = emission_time_matrix(data)
+        detail = ', '.join(f'{s}=' + str(dict(zip(outgroup_name,row))) for s, row in zip(state_names, times))
+        raise ValueError('The conditional emissions need one ordering of the outgroups along which the coalescence '
+                         f'times of every ancestry decrease, and this demography has none ({detail}).')
+    return order
+
+#Whether -conditional can actually be honoured for this demography. When it cannot, explain why and fall back to
+#the independent emissions instead of decoding something meaningless.
+def resolve_conditional(conditional, demo_file):
+    if not conditional:
+        return False
+    with open(demo_file) as json_file:
+        data = json.load(json_file)
+    if conditional_order(data) is not None:
+        return True
+    state_names, outgroup_name, times = emission_time_matrix(data)
+    print('-' * 40)
+    print('> -conditional ignored: this demography has no single ordering of the outgroups along which the')
+    print('  coalescence times of every ancestry decrease, which the conditional emissions require (supp. S1).')
+    for state, row in zip(state_names, times):
+        print(f'    {state:>12s}: ' + ', '.join(f'{o}={t:.0f}' for o, t in zip(outgroup_name, row)))
+    print('> Decoding with the independent emissions instead.')
+    print('-' * 40)
+    return False
 
 def get_most_recent_ancestor(ancestries_0,ancestries_1):
     res=pow(2,16)
