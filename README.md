@@ -65,8 +65,12 @@ If the data is unphased add option `-haploid`.
 
 The default decoding algorithm used is Viterbi, add option `-posterior` to use Posterior Decoding.
 
+Use -conditional to use conditional probabilities as described in Supplementary Materials 1. This option can only be used for specific demographies (see S1), but DAIseg automatically switches back to default if the demography does not allow this option, so it can be safely used.
+
 The bcf files for the ingroup and outgroup can be the same.
 The segments can be found for each individuals in:
 ```
 <out directory>/decode/<individual name>.decode.txt.
 ```
+
+
