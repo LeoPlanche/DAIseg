@@ -110,8 +110,17 @@ def main():
 
     args = parser.parse_args()
 
+    if getattr(args, 'em', False):
+        args.conditional = True
+    
     if getattr(args, 'conditional', False):
         args.conditional = resolve_conditional(args.conditional, args.demo)
+        
+    if getattr(args, 'em', False):
+        if not args.conditional:
+            print('> -em ignored: this demography has no valid ordering of the outgroups (supp. S1).')
+            print('> Decoding with the times of the demographic file.')
+            args.em = False
 
     # Decode observations using parameters
     # ------------------------------------------------------------------------------------------------------------
