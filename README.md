@@ -61,11 +61,6 @@ Simply run:
 ```
 ./main.py all  -demo <demographic>.json -ind <sample list>.json -vcfIn <data for all samples in the ingroup>.bcf -vcfOut <data for all samples in the outgroups>.bcf -weights <mask>.bed -out=<out directory>
 ```
-If the data is unphased add option `-haploid`.
-
-The default decoding algorithm used is Viterbi, add option `-posterior` to use Posterior Decoding.
-
-Use `-conditional` to use conditional probabilities as described in Supplementary Materials 1. This option can only be used for specific demographies (see S1), but DAIseg automatically switches back to default if the demography does not allow it, so it can be safely used.
 
 The bcf files for the ingroup and outgroup can be the same.
 The segments can be found for each individuals in:
@@ -73,4 +68,35 @@ The segments can be found for each individuals in:
 <out directory>/decode/<individual name>.decode.txt.
 ```
 
+---
 
+If the data is unphased add option `-haploid`.
+
+---
+
+The default decoding algorithm used is Viterbi, add option `-posterior` to use Posterior Decoding.
+
+---
+
+Use `-conditional` to use conditional probabilities as described in Supplementary Materials 1. This option can only be used for specific demographies (see S1), but DAIseg automatically switches back to default if the demography does not allow it, so it can be safely used.
+
+
+
+---
+
+Use `-em` to estimate the coalescence times of the demographic model from the data. We describe the algorithm for the specific case of multiple waves of introgression into Papuans in Supplementary Materials 3.
+
+The times are estimated jointly on all the individuals of the ingroup and the segments are then decoded with the estimated values. The `-em` option automatically turns on `-conditional` as well. If the `-conditional` option cannot be used with the demography (see S1), then a warning message is shown and DAIseg automatically switches back to default.
+
+The times of the demographic file are used as the starting point of the estimation. These are the times (given by the user) at which two lineages enter the same population, while the estimated values are the times at which they coalesce, so the estimated values are usually older.  Only the coalescence times used in the emission probabilities are estimated (which corresponds to split times), the admixture times which are used in the transition are not estimated and stay as given in the demographic file.
+
+The algorithm stops after `-em_iter` iterations (default 50), or when the log-likelihood improves by less than `-em_tol` (default 0.1).
+
+The estimated parameters can be found in:
+```
+<out directory>/em.json
+```
+and the log-likelihood and the times at each iteration in:
+```
+<out directory>/em_log.txt
+```
