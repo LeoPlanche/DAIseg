@@ -4,7 +4,7 @@ from numba import njit
 import json
 import math
 
-from helper_functions import   Make_folder_if_not_exists, flatten_list, get_split_times, get_ancestral_proportion, get_most_recent_ancestor, get_most_recent_ancestor_event, get_ancestries, get_split_times_recombination, require_conditional_order
+from helper_functions import   Make_folder_if_not_exists,  get_split_times, get_ancestral_proportion, get_most_recent_ancestor, get_most_recent_ancestor_event, get_ancestries, get_split_times_recombination, require_conditional_order
 
 # Shortest coalescence time (generations) an emission class may be given; see DemoStructure.hmm.
 MIN_COALESCENCE_TIME = 1.0
