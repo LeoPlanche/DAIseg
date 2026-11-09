@@ -4,11 +4,9 @@ from numba import njit
 import json
 import math
 
-from helper_functions import  Annotate_with_ref_genome, Make_folder_if_not_exists, flatten_list, get_split_times, get_ancestral_proportion, get_most_recent_ancestor, get_ancestries, get_split_times_recombination, require_conditional_order
+from helper_functions import   Make_folder_if_not_exists, flatten_list, get_split_times, get_ancestral_proportion, get_most_recent_ancestor, get_most_recent_ancestor_event, get_ancestries, get_split_times_recombination, require_conditional_order
 
-# Shortest coalescence time (generations) an emission class may be given. With conditional emissions two outgroups
-# of a state can share a coalescence time, and the class between them would otherwise get rate exactly 0, i.e.
-# probability 0 for any count >= 1 -- a single private variant would make that state impossible in the window.
+# Shortest coalescence time (generations) an emission class may be given; see DemoStructure.hmm.
 MIN_COALESCENCE_TIME = 1.0
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -33,86 +31,100 @@ class HMMParam:
     def __repr__(self):
         return f'{self.__class__.__name__}({self.state_names}, {self.starting_probabilities}, {self.transitions}, {self.emissions})'
         
+# Demographic parametrization of the HMM. Each (state, outgroup) emission time is the time at which the two lineages
+# first share a population; the event (population, entry time) is one parameter, shared by all pairs that meet there.
+# theta = coalescence times of these events (generations), rec_times/props = admixture time and proportion of each state.
+class DemoStructure:
+    def __init__(self, data, conditional=False):
+        self.conditional = conditional
+        self.outgroup_names = [pop["name"] for pop in data["pop"] if "outgroup" in pop["type"]]
+        self.state_names = [pop["name"] for pop in data["pop"] if "ancestral" in pop["type"]]
+        for pop in (pop for pop in data["pop"] if "ingroup" in pop["type"]):
+            ingroup_name = pop["name"]
+        if ingroup_name not in self.state_names:
+            raise ValueError(f'The ingroup population {ingroup_name} must also have type "ancestral"')
+        self.default_state = self.state_names.index(ingroup_name)
+
+        ancestries_ingroup = get_ancestries(ingroup_name, data)
+        self.param_keys = []
+        theta = []
+        events = []  # events[state][outgroup] = parameter index
+        for state in self.state_names:
+            ancestries_state = get_ancestries(state, data, state != ingroup_name)
+            events.append([])
+            for outgroup in self.outgroup_names:
+                ancestries_outgroup = get_ancestries(outgroup, data)
+                e = get_most_recent_ancestor_event(ancestries_state, ancestries_outgroup)
+                e_in = get_most_recent_ancestor_event(ancestries_ingroup, ancestries_outgroup)
+                if e_in[0] > e[0]:
+                    e = e_in
+                key = f'{e[1]}@{e[0]}'
+                if key not in self.param_keys:
+                    self.param_keys.append(key)
+                    theta.append(e[0])
+                events[-1].append(self.param_keys.index(key))
+        self.theta = np.array(theta, dtype=float)
+
+        # A[state][k] . theta = emission time of class k (conditional: outgroups sorted by decreasing time, as in Load_observations)
+        n_out = len(self.outgroup_names)
+        self.A = np.zeros((len(self.state_names), n_out, len(theta)))
+        self.order = require_conditional_order(data) if conditional else list(range(n_out))
+        for s in range(len(self.state_names)):
+            order = self.order
+            for k in range(n_out):
+                self.A[s, k, events[s][order[k]]] += 1
+                if conditional and k < n_out - 1:
+                    self.A[s, k, events[s][order[k + 1]]] -= 1
+
+        self.rec_times = np.array(get_split_times_recombination(ingroup_name, data, "ancestral"), dtype=float)
+        props = [get_ancestral_proportion(state, data) for state in self.state_names]
+        for i in range(len(props)):
+            if props[i] == 1:
+                props[i] = 2 - sum(props)
+        self.props = np.array(props, dtype=float)
+
+    def emission_times(self, theta):
+        return np.einsum('skp,p->sk', self.A, theta)
+
+    def hmm(self, theta=None, rec_times=None, props=None, rec_rate=1.2e-8, window_size=1000):
+        theta = self.theta if theta is None else theta
+        rec_times = self.rec_times if rec_times is None else rec_times
+        props = self.props if props is None else props
+        n = len(self.state_names)
+        # Floor at MIN_COALESCENCE_TIME: with conditional emissions two outgroups of a state can have the same
+        # coalescence time, and the class between them would then get rate exactly 0, i.e. probability 0 for any
+        # count >= 1 -- a single private variant would make the state impossible in that window. The EM applies the
+        # same floor (min_time in m_step_emissions), so the two paths stay consistent.
+        emissions = [[max(t, MIN_COALESCENCE_TIME) * window_size for t in row]
+                     for row in self.emission_times(theta).tolist()]
+        transitions = []
+        for i in range(n):
+            transitions.append([])
+            for j in range(n):
+                if i != j and rec_times[i] != 0 and rec_times[j] != 0:
+                    transitions[-1].append(window_size*rec_rate*min(rec_times[i], rec_times[j])*props[j])
+                elif i != j:
+                    transitions[-1].append(window_size*rec_rate*max(rec_times[i], rec_times[j])*props[j])
+                else:
+                    transitions[-1].append(0)
+        for i in range(n):
+            transitions[i][i] = 1-sum(transitions[i])
+        hmm = HMMParam(state_names=self.state_names,
+                       starting_probabilities=list(props),
+                       transitions=transitions,
+                       emissions=emissions,
+                       default_state=self.default_state)
+        hmm.param_keys = self.param_keys
+        hmm.theta = np.array(theta)
+        hmm.rec_times = np.array(rec_times)
+        return hmm
+
+
 # Read HMM parameters from a json file
 def create_HMM_parameters_from_file(filename,conditional=False):
-    rec_rate =1.2e-8
-
     with open(filename) as json_file:
         data = json.load(json_file)
-
-    state_names = []
-    outgroup_name = []
-    emissions = []
-    starting_probabilities = []
-    transitions = []
-    for pop in  (pop for pop in data["pop"] if "ingroup" in pop["type"] ):
-        ingroup_name=pop["name"]
-
-    for pop in  (pop for pop in data["pop"] if "outgroup" in pop["type"] ):
-        outgroup_name.append(pop["name"])
-        
-
-    for state in  (state for state in data["pop"] if "ancestral" in state["type"] ):
-        state_names.append(state["name"])
-
-    if conditional:
-        #one ordering of the outgroups, shared by every state, as Load_observations uses to classify the variants
-        order = require_conditional_order(data)
-        for state in state_names:
-            starting_probabilities.append(get_ancestral_proportion(state,data))
-            emissions.append([])
-            times = get_split_times(state,data,"outgroup")
-            for i in range(len(outgroup_name)):
-                ancestries_ingroup = get_ancestries(ingroup_name,data)
-                ancestries_outgtoup = get_ancestries(outgroup_name[i],data)
-                times[i] = max(times[i],get_most_recent_ancestor(ancestries_ingroup,ancestries_outgtoup))
-
-            times = [times[i] for i in order]
-            for i in range(len(times)-1):
-                emissions[-1].append(max(times[i]-times[i+1],MIN_COALESCENCE_TIME)*1000)
-            emissions[-1].append(max(times[-1],MIN_COALESCENCE_TIME)*1000)
-
-        for i in range(len(starting_probabilities)):
-            if starting_probabilities[i]==1:
-                starting_probabilities[i]=2-sum(starting_probabilities)
-    else:
-        for state in state_names:
-            starting_probabilities.append(get_ancestral_proportion(state,data))        
-            emissions.append([])
-            times = get_split_times(state,data,"outgroup")
-            for i in range(len(outgroup_name)):
-                ancestries_ingroup = get_ancestries(ingroup_name,data)   
-                ancestries_outgtoup = get_ancestries(outgroup_name[i],data)   
-                times[i] = max(times[i],get_most_recent_ancestor(ancestries_ingroup,ancestries_outgtoup))
-                emissions[-1].append(max(times[i],MIN_COALESCENCE_TIME)*1000)
-            
-        for i in range(len(starting_probabilities)):
-            if starting_probabilities[i]==1:
-                starting_probabilities[i]=2-sum(starting_probabilities)
-
-
-    recombination_time=get_split_times_recombination(ingroup_name,data,"ancestral")
-    for i in range(len(state_names)):
-        transitions.append([])
-        for j in range(len(state_names)):
-            if i!=j and recombination_time[i]!=0 and recombination_time[j]!=0:
-                transitions[-1].append(1000*rec_rate*min(recombination_time[i],recombination_time[j])*starting_probabilities[j])
-            elif i!=j:
-                transitions[-1].append(1000*rec_rate*max(recombination_time[i],recombination_time[j])*starting_probabilities[j])
-            else:
-                transitions[-1].append(0)
-                
-    for i in range(len(state_names)):
-        transitions[i][i]=1-sum(transitions[i])
-
-    if ingroup_name not in state_names:
-        raise ValueError(f'The ingroup population {ingroup_name} must also have type "ancestral" in {filename}')
-
-    return HMMParam(state_names=state_names,
-                    starting_probabilities=starting_probabilities,
-                    transitions=transitions,
-                    emissions=emissions,
-                    default_state=state_names.index(ingroup_name))
+    return DemoStructure(data, conditional).hmm()
 
 
 
@@ -188,7 +200,7 @@ def Write_Decoded_output(outputprefix, segments, filename , ind="" , window_size
                 start=0
                 for i in range(1,len(curr)):
                     if curr[i]!=curr[i-1]:
-                        out.write(f'{chrom}\t{start*window_size}\t{(i-1)*window_size}\t{i-start}\t{states_name[curr[i-1]]}\n')
+                        out.write(f'{chrom}\t{start*window_size}\t{i*window_size}\t{i-start}\t{states_name[curr[i-1]]}\n')
                         start=i
                 out.write(f'{chrom}\t{start*window_size}\t{len(curr)*window_size}\t{len(curr)-start}\t{states_name[curr[-1]]}\n')
 

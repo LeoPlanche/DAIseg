@@ -3,13 +3,41 @@
 import argparse
 import numpy as np
 import os
+import json
 
-from hmm_functions import  DecodeModel, write_HMM_to_file, create_HMM_parameters_from_file, Write_Decoded_output
+from hmm_functions import  DecodeModel, write_HMM_to_file, create_HMM_parameters_from_file, Write_Decoded_output, DemoStructure
+from em import fit_em, flatten_observations, em_report
 from bcf_vcf import make_out_group, make_ingroup_obs
 #from make_test_data import create_test_data
 from make_mutationrate import make_mutation_rate
 from helper_functions import Load_observations_weights_mutrates, handle_individuals_input, handle_infiles, combined_files, Load_observations, resolve_conditional
 
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Estimate the demographic parameters of the HMM by EM on all ingroup individuals jointly.
+# Returns the fitted HMMParam and the loaded observations (individual -> (obs, max_obs)).
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+def run_em(args, ingroup_individuals):
+    loaded = {}
+    for individual in ingroup_individuals:
+        loaded[individual] = Load_observations(args.out, individual, args.demo, 1000, haploid= args.haploid,obs_name="obs/obs",conditional=args.conditional)
+    max_obs = max(m for (o, m) in loaded.values())
+    with open(args.demo) as json_file:
+        structure = DemoStructure(json.load(json_file), args.conditional)
+    print('-' * 40)
+    print(f'> EM on {len(ingroup_individuals)} individuals, parameters:', ', '.join(structure.param_keys))
+    print('-' * 40)
+    with open(args.out+"/em_log.txt", 'w') as log:
+        def write_log(line):
+            print(line)
+            log.write(line + '\n')
+        hmm_parameters, info = fit_em(structure, flatten_observations([o for (o, m) in loaded.values()]), max_obs,
+                                      max_iter=args.em_iter, tol=args.em_tol, log=write_log)
+    info['individuals'] = len(ingroup_individuals)
+    with open(args.out+"/em.json", 'w') as out:
+        json.dump(em_report(structure, hmm_parameters, info), out, indent=2)
+    print(f'> EM parameters written to {args.out}/em.json')
+    return hmm_parameters, loaded
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 # Main
@@ -56,10 +84,11 @@ def main():
     decode_subparser.add_argument("-out", metavar='',help="outputfile prefix <out>.hap1.txt and <out>.hap2.txt if -haploid option is used or <out>.diploid.txt (default is stdout)", default = '/dev/stdout')
     decode_subparser.add_argument("-window_size", metavar='',help="size of bins (default is 1000 bp)", type=int, default = 1000)
     decode_subparser.add_argument("-haploid",help="Change from using diploid data to haploid data (default is diploid)", action='store_true', default = True)
-    decode_subparser.add_argument("-admixpop",help="Annotate using vcffile with admixing population (default is none)")
-    decode_subparser.add_argument("-extrainfo",help="Add archaic information on each SNP", action='store_true', default = False)
     decode_subparser.add_argument("-conditional",help="Use conditional probability (default is False)", action='store_true', default = False)
     decode_subparser.add_argument("-posterior",help="Use Posterior Decoding (default is False and Viterbi is used)", action='store_true', default = False)
+    decode_subparser.add_argument("-em",help="Estimate the coalescence times of the demography by EM before decoding", action='store_true', default = False)
+    decode_subparser.add_argument("-em_iter",help="Maximum number of EM iterations (default 50)", type=int, default = 50)
+    decode_subparser.add_argument("-em_tol",help="Stop EM when the log-likelihood improves by less than this (default 0.1)", type=float, default = 0.1)
     # all model
     all_subparser = subparser.add_parser('all', help='Run HMM from beginning to end')
     all_subparser.add_argument("-ind",help="[required] ingroup/outgrop list (json file) or comma-separated list e.g. ind1,ind2", type=str, required = True)
@@ -73,6 +102,9 @@ def main():
     all_subparser.add_argument("-haploid",help="Change from using diploid data to haploid data (default is diploid)", action='store_true', default = False)
     all_subparser.add_argument("-conditional",help="Use conditional probability (default is False)", action='store_true', default = False)
     all_subparser.add_argument("-posterior",help="Use Posterior Decoding (default is False and Viterbi is used)", action='store_true', default = False)
+    all_subparser.add_argument("-em",help="Estimate the coalescence times of the demography by EM before decoding", action='store_true', default = False)
+    all_subparser.add_argument("-em_iter",help="Maximum number of EM iterations (default 50)", type=int, default = 50)
+    all_subparser.add_argument("-em_tol",help="Stop EM when the log-likelihood improves by less than this (default 0.1)", type=float, default = 0.1)
     
     
 
@@ -89,9 +121,12 @@ def main():
         ingroup_individuals = handle_individuals_input(args.ind,'ingroup')
         os.mkdir(args.out+"/decode")
         hmm_parameters = create_HMM_parameters_from_file(args.demo,conditional=args.conditional)
+        loaded = {}
+        if args.em:
+            hmm_parameters, loaded = run_em(args, ingroup_individuals)
     
         for individual in ingroup_individuals:
-            (obs,max_obs) =  Load_observations(args.out, individual, args.demo, 1000, haploid= args.haploid,obs_name="obs/obs",conditional=args.conditional)
+            (obs,max_obs) =  loaded.pop(individual) if individual in loaded else Load_observations(args.out, individual, args.demo, 1000, haploid= args.haploid,obs_name="obs/obs",conditional=args.conditional)
             len_obs = 0
             for key in obs:
                 len_obs+=len(obs[key][0])
@@ -258,17 +293,21 @@ def main():
         #decode
         os.mkdir(args.out+"/decode")
         hmm_parameters = create_HMM_parameters_from_file(args.demo,conditional=args.conditional)
+        loaded = {}
+        if args.em:
+            hmm_parameters, loaded = run_em(args, ingroup_individuals)
 
         for individual in ingroup_individuals:
-            (obs,max_obs) =  Load_observations(args.out, individual, args.demo, 1000, haploid= args.haploid,obs_name="obs/obs",conditional=args.conditional)
+            (obs,max_obs) =  loaded.pop(individual) if individual in loaded else Load_observations(args.out, individual, args.demo, 1000, haploid= args.haploid,obs_name="obs/obs",conditional=args.conditional)
             len_obs = 0
             for key in obs:
                 len_obs+=len(obs[key][0])
             
             print('-' * 40)
+            print('> Individual:', individual)
             print(hmm_parameters)  
-            print('> number of windows:', len_obs)
-            print('> max observation per window:', max_obs)
+            print('> Number of windows:', len_obs)
+            print('> Max observation per window:', max_obs)
             print('> Output prefix is',args.out+"/decode/") 
             print('> Window size is',1000, 'bp') 
             print('> Haploid',args.haploid)
